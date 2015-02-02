@@ -61,11 +61,11 @@ function responseHandlePRIVMSG(data) {
 	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+([^"]+)(?:")+)+|([^ ]+)+)+(?: )*', 'g');
 	while ((ircMessageARG = ircMessageARGRegex.exec(data[2])) !== null) {if(ircMessageARG[1] != null){ircMessageARGS[ircMessageARGC]=ircMessageARG[1];}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++}
 	if (data[2] == ".hug") {sendCommandPRIVMSG('*Hugs '+data[1]+'*');}
-	if (data[2] == ".rules") {sendCommandPRIVMSG('This are the real rules:');sendCommandPRIVMSG('[1] - No spam');sendCommandPRIVMSG('[2] - Only Squeebot and nBot are allowed');sendCommandPRIVMSG('[3] - No insulting others');sendCommandPRIVMSG('[4] - Keep Calm.');}
-	if ((commandArgsWhereis = new RegExp('.whereis (.*)', 'g').exec(data[2])) != null) {sendCommandWHOIS(commandArgsWhereis[1], 'whereis');}
+	if (data[2] == ".whereami") {sendCommandPRIVMSG('wrong side of the internet');}
+	if ((commandArgsWhereis = new RegExp('.where(?:.*)*?(?=is)is (.*)', 'g').exec(data[2])) != null) {sendCommandWHOIS(commandArgsWhereis[1], 'whereis');}
 	if (new RegExp('(Hi|Hello) '+settings.botName, 'g').exec(data[2]) != null) {sendCommandPRIVMSG('Hi '+data[1]);}
 	if (data[2] == ".isup starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (RegExp('open', 'g').exec(stdout) != null) {sendCommandPRIVMSG('starbound server is up');}else{sendCommandPRIVMSG('starbound server is down');}});}
-	if (ircMessageARGS[0] == ".echo") {sendCommandPRIVMSG(ircMessageARGS[1].replace(/#c(?!si)/g, '\x03').replace(/#csi/g, '\x1B['));}
+	if (ircMessageARGS[0] == ".echo") {sendCommandPRIVMSG(ircMessageARGS[1].replace(/#c(?!si)/g, '\x03').replace(/#csi/g, '\x1B[').replace(new RegExp('#x([0-9a-fA-F]{2})', 'g'), function(regex, hex){return eval('"\\x'+hex+'"');}));}
 }
 
 function responseHandleJOIN(data) {
