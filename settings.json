@@ -1,6 +1,6 @@
 {
 	"botName":"nBot",
-	"hostName":"mindcraft.si.eu.org",
+	"hostName":"localhost",
 	"ircServer":"irc.canternet.org",
-    	"channel":"#BronyTalk"
+    	"channels":["#BronyTalkTest", "#BronyTalk", "#parasprite"]
 }
