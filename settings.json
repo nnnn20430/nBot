@@ -2,5 +2,8 @@
 	"botName":"nBot",
 	"hostName":"localhost",
 	"ircServer":"irc.canternet.org",
-    	"channels":["#BronyTalkTest", "#BronyTalk", "#parasprite"]
+	"ircServerPort":6667,
+    	"channels":["#mindcraft", "#BronyTalkTest", "#BronyTalk", "#parasprite"],
+    	"ircRelayServerPort":9977,
+    	"command_request_maxBytes":1024
 }
