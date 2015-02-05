@@ -3,7 +3,8 @@
 	"hostName":"localhost",
 	"ircServer":"irc.canternet.org",
 	"ircServerPort":6667,
-    	"channels":["#mindcraft", "#BronyTalkTest", "#BronyTalk", "#parasprite"],
-    	"ircRelayServerPort":9977,
-    	"command_request_maxBytes":1024
+    "channels":["#mindcraft", "#BronyTalkTest", "#BronyTalk", "#parasprite"],
+	"ircRelayServerPort":9977,
+	"ircRelayServerEnabled":true,
+	"command_request_maxBytes":1024
 }

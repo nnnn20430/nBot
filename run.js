@@ -125,18 +125,32 @@ function ircJoinMissingChannels() {
 	})
 }
 
+//misc functions: return help
+function ircSendHelpToUser(user) {
+	sendCommandPRIVMSG('.hug: gives you a free hug\n\
+.whereami: tells you where you are\n\
+.isup starbound: checks if my starbound server on mindcraft.si.eu.org is up\n\
+.echo "string": prints string back to the chat\n\
+.sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)\n\
+.view "url": prints the data located at the url, data must not be bigger than 1KB\n\
+.ping "host" "port": pings the port on host\n\
+.nbot: prints some info about nBot\n\
+.help: prints this message\n\
+.away: prints a list of away users in the channel', user);
+}
+
 //irc command functions
-function sendCommandPRIVMSG(data, channel, timeout){
-	var privmsgLenght = 512-(":"+settings.botName+"!"+ircBotWhoisHost[1]+"@"+ircBotWhoisHost[2]+" "+channel+" :\r\n").length
+function sendCommandPRIVMSG(data, to, timeout){
+	var privmsgLenght = 512-(":"+settings.botName+"!"+ircBotWhoisHost[1]+"@"+ircBotWhoisHost[2]+" "+to+" :\r\n").length
 	var dataLengthRegExp = new RegExp('.{1,'+privmsgLenght+'}', 'g'), stringArray = [], c = 0, timeout=timeout||1000;
-	function writeData(data, channel, c, timeout) {
-		setTimeout(function() {ircConnection.write('PRIVMSG '+channel+' :'+data[c]+'\r\n'); c++; if (data[c] != null) {writeData(data, channel, c, timeout)}; }, timeout)
+	function writeData(data, to, c, timeout) {
+		setTimeout(function() {ircConnection.write('PRIVMSG '+to+' :'+data[c]+'\r\n'); c++; if (data[c] != null) {writeData(data, to, c, timeout)}; }, timeout)
 	}
 	while ((string = dataLengthRegExp.exec(data)) !== null) {
 		stringArray[c]=string[0];c++
 	}
 	if (c <= 1){timeout=0};
-	writeData(stringArray, channel, 0, timeout);
+	writeData(stringArray, to, 0, timeout);
 }
 
 function sendCommandWHOIS(user, callback) {
@@ -149,6 +163,18 @@ function sendCommandWHOIS(user, callback) {
 		});
 	}
 	handleresponseWHOISEvent(user);
+}
+
+function sendCommandWHO(channel, callback) {
+	ircConnection.write('WHO '+channel+'\r\n');
+	function handleresponseWHOEvent(channel) {
+		emitter.once('responseWHO', function (data) {
+			if (data[1] == channel) {
+				if (callback != null) {callback(data);}
+			}else{handleresponseWHOEvent(channel);}
+		});
+	}
+	handleresponseWHOEvent(channel);
 }
 
 //irc command handle functions
@@ -164,14 +190,20 @@ function responseHandlePRIVMSG(data) {
 	if (data[3] == ".isup starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (RegExp('open', 'g').exec(stdout) != null) {sendCommandPRIVMSG('starbound server is up', data[2]);}else{sendCommandPRIVMSG('starbound server is down', data[2]);};});};
 	if (ircMessageARGS[0] == ".echo") {sendCommandPRIVMSG(ircMessageARGS[1].replaceSpecialChars(), data[2]);};
 	if (new RegExp('(?:.channelmsg|.cmsg|.chanmsg|.sendmsg)', 'gi').exec(ircMessageARGS[0])) {sendCommandPRIVMSG(ircMessageARGS[2].replaceSpecialChars(), ircMessageARGS[1]);};
-	if (ircMessageARGS[0] == ".request") {http.get(ircMessageARGS[1], function(res) {res.on('data', function (chunk) {if(chunk.length < settings.command_request_maxBytes){sendCommandPRIVMSG(chunk, data[2]);}});}).on('error', function(e) {sendCommandPRIVMSG("Got error: "+e.message, data[2]);});};
+	if (ircMessageARGS[0] == ".view") {http.get(ircMessageARGS[1], function(res) {res.on('data', function (chunk) {if(chunk.length < settings.command_request_maxBytes){sendCommandPRIVMSG(chunk, data[2]);}});}).on('error', function(e) {sendCommandPRIVMSG("Got error: "+e.message, data[2]);});};
 	if (ircMessageARGS[0] == ".ping") {pingTcpServer(ircMessageARGS[1], ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open"}else{statusString="closed"}sendCommandPRIVMSG("Port "+ircMessageARGS[2]+" on "+ircMessageARGS[1]+" is: "+statusString, data[2]);});};
 	if (ircMessageARGS[0] == ".nbot") {sendCommandPRIVMSG("I'm a random bot writen for fun, you can see my code here: http://mindcraft.si.eu.org/git/?p=nBot.git", data[2]);};
+	if (ircMessageARGS[0] == ".help") {ircSendHelpToUser(data[1]);};
+	if (ircMessageARGS[0] == ".away") {var originChannel = data[2];sendCommandWHO(data[2], function (data) {var ircGoneUsersRegex = new RegExp('([^ \r\n]+){1} G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(data[0])) != null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";};sendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away'), originChannel);});};
 }
 
 function responseHandleWHOIS(data) {
 	if (data[1] == settings.botName) { ircBotWhoisHost = new RegExp(data[1]+' ([^ \r\n]+) ([^ *\r\n]+) \\*').exec(data[0]) };
 	emitter.emit('responseWHOIS', data);
+}
+
+function responseHandleWHO(data) {
+	emitter.emit('responseWHO', data);
 }
 
 function responseHandleJOIN(data) {
@@ -181,12 +213,19 @@ function responseHandleJOIN(data) {
 //main irc data receiving function
 function ircDataReceiveHandle(data, ircConnection) {
 	//console.log(data);
-	var ircWHOIS = new RegExp('311 [^ \r\n]* ([^ \r\n]+) (?:[^ \r\n]+ ){2}(?=\\*)\\* :[^\r\n]*(\r\n:[^\r\n]*)+?(?=:End of /WHOIS list):End of /WHOIS list', 'g').exec(data);
-	var ircPRIVMSG = new RegExp(':([^! \r\n]+)![^@ \r\n]+@[^ \r\n]+ PRIVMSG (#[^ \r\n]+) :([^\r\n]*)', 'g').exec(data);
-	var ircJOIN = new RegExp(':([^! \r\n]+)![^@ \r\n]+@[^ \r\n]+ JOIN :(#[^ \r\n]+)', 'g').exec(data);
-	if (ircWHOIS != null){responseHandleWHOIS(ircWHOIS);};
-	if (ircPRIVMSG != null){responseHandlePRIVMSG(ircPRIVMSG);};
-	if (ircJOIN != null){responseHandleJOIN(ircJOIN);};
+	var ircMessageLines = {}, ircMessageLineC = 0, ircMessageLine, ircMessageLineRegex = new RegExp('([^\r\n]+)', 'g');
+	while ((ircMessageLine = ircMessageLineRegex.exec(data)) !== null) {ircMessageLines[ircMessageLineC]=ircMessageLine[1];ircMessageLineC++};
+	for (line in ircMessageLines) {
+		line=ircMessageLines[line];
+		//parse single lines here
+		var ircPRIVMSG = new RegExp(':([^! \r\n]+)![^@ \r\n]+@[^ \r\n]+ PRIVMSG (#[^ \r\n]+) :([^\r\n]*)', 'g').exec(line); if (ircPRIVMSG != null){responseHandlePRIVMSG(ircPRIVMSG);};
+		var ircJOIN = new RegExp(':([^! \r\n]+)![^@ \r\n]+@[^ \r\n]+ JOIN :(#[^ \r\n]*)', 'g').exec(line); if (ircJOIN != null){responseHandleJOIN(ircJOIN);};
+	}
+	//parse whole response here
+	var ircWHOISRegex = new RegExp('311 (?:[^ \r\n]* ){0,1}([^ \r\n]+) (?:[^ \r\n]+ ){2}(?=\\*)\\* :[^\r\n]*(\r\n:[^\r\n]*)+?(?=:End of \\/WHOIS list):End of \\/WHOIS list', 'g'),
+		ircWHORegex = new RegExp('352 (?:[^ \r\n]* ){0,1}([^ \r\n]+) (?:[^ \r\n]+ ){3}(?=[^ \r\n]+ (?:H|G)+)([^ \r\n]+) (?:H|G){1}(?:\\*){0,1}(?:@|\\+){0,1} :[^\r\n]*(\r\n:[^\r\n]*)+?(?=:End of \\/WHO list):End of \\/WHO list', 'g');
+	while ((ircWHOIS = ircWHOISRegex.exec(data)) !== null) {if (ircWHOIS != null){responseHandleWHOIS(ircWHOIS);};};
+	while ((ircWHO = ircWHORegex.exec(data)) !== null) {if (ircWHO != null){responseHandleWHO(ircWHO);};};
 }
 
 //starts the bot
@@ -204,5 +243,5 @@ function initIrc() {
 	ircConnection.on('close', function() {if(ircConnectionCompleted){clearInterval(whoisIntervalLoop);}else{clearInterval(ircConnectionCompletedCheckLoop);}; setTimeout(function() {initIrc();}, 3000);});
 }
 
-ircRelayServer();
+if(settings.ircRelayServerEnabled){ircRelayServer();};
 initIrc();
