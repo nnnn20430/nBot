@@ -10,8 +10,8 @@ var http = require('http'),
 	settings = require('./settings.json'),
 	whoisIntervalLoop,
 	ircBotWhoisHost = "",
-	ircConnectionCompleted = false,
-	ircConnectionCompletedCheckLoop;
+	ircConnectionRegistrationCompleted = false,
+	ircConnectionRegistrationCompletedCheck;
 var events = require("events");
 var emitter = new events.EventEmitter();
 var ircRelayServerEmitter = new events.EventEmitter(); ircRelayServerEmitter.setMaxListeners(0);
@@ -110,19 +110,16 @@ function pingTcpServer(host, port, callback){
 }
 
 //misc functions: join missing channels
-function ircJoinMissingChannels() {
-	sendCommandWHOIS(settings.botName, function(data){
-		var channelArray=whoisParseChannels(data);
-		var missingChannels=settings.channels.diff(channelArray[0]);
-		for (channel in missingChannels){
-			if(settings.channels.hasOwnProperty(channel)){
-				console.log("joining channel: "+missingChannels[channel]);
-				ircConnection.write('JOIN '+missingChannels[channel]+'\r\n')
-			}
-			
+function ircJoinMissingChannels(data) {
+	var channelArray=whoisParseChannels(data);
+	var missingChannels=settings.channels.diff(channelArray[0]);
+	for (channel in missingChannels){
+		if(settings.channels.hasOwnProperty(channel)){
+			console.log("joining channel: "+missingChannels[channel]);
+			ircConnection.write('JOIN '+missingChannels[channel]+'\r\n')
 		}
 		
-	})
+	}	
 }
 
 //misc functions: return help
@@ -297,6 +294,7 @@ function ircDataReceiveHandle(data, ircConnection) {
 	for (line in ircMessageLines) {
 		line=ircMessageLines[line];
 		//parse single lines here
+		if (ircConnectionRegistrationCompleted==false) {if (new RegExp('001 '+settings.botName, 'g').exec(line) != null){ircConnectionRegistrationCompleted=true;}};
 		var ircPRIVMSG = new RegExp(':([^! \r\n]+)![^@ \r\n]+@[^ \r\n]+ PRIVMSG (#[^ \r\n]+) :([^\r\n]*)', 'g').exec(line); if (ircPRIVMSG != null){responseHandlePRIVMSG(ircPRIVMSG);};
 		var ircJOIN = new RegExp(':([^! \r\n]+)!([^@ \r\n]+)@([^ \r\n]+) JOIN :(#[^ \r\n]*)', 'g').exec(line); if (ircJOIN != null){responseHandleJOIN(ircJOIN);};
 	}
@@ -317,13 +315,13 @@ function initIrc() {
 			if (settings.ircServerPassword != "") {ircConnection.write('PASS '+settings.ircServerPassword+'\r\n');};
 			ircConnection.write('NICK '+settings.botName+'\r\n');
 			ircConnection.write('USER '+settings.botName+' '+settings.hostName+' '+settings.ircServer+' :'+settings.botName+'\r\n');
-			console.log('waiting for server to complete connection initialization');
-			ircConnectionCompletedCheckLoop = setInterval(function () {if(!ircConnectionCompleted){sendCommandWHOIS(settings.botName, function(data) {if(data != null){ircConnectionCompleted=true;};});}else{clearInterval(ircConnectionCompletedCheckLoop);console.log('joining channels...');whoisIntervalLoop = setInterval(function () {ircJoinMissingChannels();}, 5000);};}, 5000);
+			console.log('waiting for server to complete connection registration');
+			ircConnectionRegistrationCompletedCheck = setInterval(function () {if(ircConnectionRegistrationCompleted){clearInterval(ircConnectionRegistrationCompletedCheck);console.log('joining channels...');sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});whoisIntervalLoop = setInterval(function () {sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});}, 5000);};}, 1000);
 	});
-	ircConnection.setTimeout(15000);
+	ircConnection.setTimeout(60*1000);
 	ircConnection.on('error', function (e) {ircConnection.end();ircConnection.destroy();console.log("Got error: "+e.message);});
 	ircConnection.on('timeout', function (e) {ircConnection.end();ircConnection.destroy();console.log('connection timeout');});
-	ircConnection.on('close', function() {if(ircConnectionCompleted){clearInterval(whoisIntervalLoop);}else{clearInterval(ircConnectionCompletedCheckLoop);}; setTimeout(function() {initIrc();}, 3000);});
+	ircConnection.on('close', function() {if(ircConnectionRegistrationCompleted){clearInterval(whoisIntervalLoop);}else{clearInterval(ircConnectionRegistrationCompletedCheck);}; setTimeout(function() {initIrc();}, 3000);});
 }
 
 if(settings.ircRelayServerEnabled){ircRelayServer();};
