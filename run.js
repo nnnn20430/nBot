@@ -136,7 +136,9 @@ function ircSendHelpToUser(user) {
 .ping "host" "port": pings the port on host\n\
 .nbot: prints some info about nBot\n\
 .help: prints this message\n\
-.away: prints a list of away users in the channel', user);
+.away: prints a list of away users in the channel\n\
+.randomlittleface: get random image from mylittlefacewhen.com\n\
+.np: shows currently playing song on the radio', user);
 }
 
 //misc functions: get random img from mylittlefacewhen.com
