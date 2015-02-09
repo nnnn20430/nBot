@@ -277,61 +277,42 @@ function takeOp(user) {
 //misc functions: command help manager and such
 function commandHelp(purpose, command) {
 	var response;
+	helpArray = [['hug', 'hug: gives you a free hug'],
+		['whereami', 'whereami: tells you where you are'],
+		['whereis', 'whereis "user": lists the channels the user is in (the command can contain anything between where and is)'],
+		['isup starbound', 'isup starbound: checks if my starbound server on mindcraft.si.eu.org is up'],
+		['echo', 'echo "string": prints string back to the chat'],
+		['sendmsg', 'sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)'],
+		['view', 'view "url": prints the data located at the url, data must not be bigger than 1KiB'],
+		['ping', 'ping "host" "port": pings the port on host'],
+		['nbot', 'nbot: prints some info about nBot'],
+		['help', 'help: prints help message'],
+		['away', 'away: prints a list of away users in the channel'],
+		['randomlittleface', 'randomlittleface: get random image from mylittlefacewhen.com'],
+		['np', 'np: shows currently playing song on the radio'],
+		['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
+		['savesettings', 'savesettings: save current settings to file (op only)'],
+		['join', 'join "#channel": make the bot join the channel (op only)'],
+		['part', 'part "#channel": make the bot part the channel (op only)'],
+		['pass', 'pass "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
+		['logout', 'logout: de-authenticate (op only)'],
+		['op', 'op "user": give the user Operator status (op only)'],
+		['deop', 'deop "user": take Operator status from the user (op only)'],
+		['helpall', 'helpall: prints help for all commands to the user'],
+		['responseadd', 'responseadd "trigger" "response": add a response to trigger (op only)'],
+		['responseremove', 'responseremove "trigger": remove a response from trigger (op only)'],
+		['responseclear', 'responsereclear: remove all set triggered responses (op only)']];
 	if (purpose == 'arrayOfCommands') {
-		response = ['hug',
-			'whereami',
-			'whereis',
-			'isup starbound',
-			'echo',
-			'sendmsg',
-			'view',
-			'ping',
-			'nbot',
-			'help',
-			'away',
-			'randomlittleface',
-			'np',
-			'raw',
-			'savesettings',
-			'join',
-			'part',
-			'pass',
-			'logout',
-			'op',
-			'deop',
-			'helpall',
-			'responseadd',
-			'responseremove',
-			'responseclear'];
+		var commandArray = [];
+		for (index in helpArray) {
+			commandArray[index] = helpArray[index][0];
+		}
+		response = commandArray;
 	}
 	if (purpose == 'commandInfo') {
-		var response = 'Command not found';
-		switch (command) {
-			case 'hug': response = 'hug: gives you a free hug'; break;
-			case 'whereami': response = 'whereami: tells you where you are'; break;
-			case 'whereis': response = 'whereis "user": lists the channels the user is in (the command can contain anything between where and is)'; break;
-			case 'isup starbound': response = 'isup starbound: checks if my starbound server on mindcraft.si.eu.org is up'; break;
-			case 'echo': response = 'echo "string": prints string back to the chat'; break;
-			case 'sendmsg': response = 'sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)'; break;
-			case 'view': response = 'view "url": prints the data located at the url, data must not be bigger than 1KiB'; break;
-			case 'ping': response = 'ping "host" "port": pings the port on host'; break;
-			case 'nbot': response = 'nbot: prints some info about nBot'; break;
-			case 'help': response = 'help: prints help message'; break;
-			case 'away': response = 'away: prints a list of away users in the channel'; break;
-			case 'randomlittleface': response = 'randomlittleface: get random image from mylittlefacewhen.com'; break;
-			case 'np': response = 'np: shows currently playing song on the radio'; break;
-			case 'raw': response = 'raw "raw command": make the bot send a raw command to the irc server (op only)'; break;
-			case 'savesettings': response = 'savesettings: save current settings to file (op only)'; break;
-			case 'join': response = 'join "#channel": make the bot join the channel (op only)'; break;
-			case 'part': response = 'part "#channel": make the bot part the channel (op only)'; break;
-			case 'pass': response = 'pass "password": authenticate as an Operator (op only)(please send this command directly to the bot)'; break;
-			case 'logout': response = 'logout: de-authenticate (op only)'; break;
-			case 'op': response = 'op "user": give the user Operator status (op only)'; break;
-			case 'deop': response = 'deop "user": take Operator status from the user (op only)'; break;
-			case 'helpall': response = 'helpall: prints help for all commands to the user'; break;
-			case 'responseadd': response = 'responseadd "trigger" "response": add a response to trigger (op only)'; break;
-			case 'responseremove': response = 'responseremove "trigger": remove a response from trigger (op only)'; break;
-			case 'responseclear': response = 'responsereclear: remove all set triggered responses (op only)'; break;
+		response = 'Command not found';
+		for (index in helpArray) {
+			if (helpArray[index][0] == command) {response = helpArray[index][1];};
 		}
 	}
 	return response;
