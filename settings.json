@@ -20,5 +20,7 @@
 		"nnnn20430"
 	],
 	"opUsers_password": "",
-	"opUsers_mustBeChanOp": false
+	"opUsers_mustBeChanOp": false,
+	"commandPrefix": ".",
+	"specificResponses": {}
 }
