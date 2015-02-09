@@ -332,33 +332,35 @@ function getHelp() {
 //misc functions: handle bot commands
 function botSimpleCommandHandle(ircData, ircMessageARGS) {
 	var command = ircMessageARGS[0];
-	if (command.substr(0, settings.commandPrefix.length) == settings.commandPrefix) {command = command.substr(settings.commandPrefix.length);};
-	var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) == null) {target = ircData[1]};
-	switch (command) {
-		case 'hug': sendCommandPRIVMSG('*Hugs '+ircData[1]+'*', target); break;
-		case 'whereami': sendCommandPRIVMSG('wrong side of the internet', target); break;
-		case 'isup': if (ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (RegExp('open', 'g').exec(stdout) != null) {sendCommandPRIVMSG('starbound server is up', target);}else{sendCommandPRIVMSG('starbound server is down', target);};})}; break;
-		case 'echo': sendCommandPRIVMSG(ircMessageARGS[1].replaceSpecialChars(), target); break;
-		case 'view': http.get(ircMessageARGS[1], function(res) {res.on('data', function (chunk) {if(chunk.length < settings.command_request_maxBytes){sendCommandPRIVMSG(chunk, target);}});}).on('error', function(e) {sendCommandPRIVMSG("Got error: "+e.message, target);}); break;
-		case 'ping': pingTcpServer(ircMessageARGS[1], ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open"}else{statusString="closed"}sendCommandPRIVMSG("Port "+ircMessageARGS[2]+" on "+ircMessageARGS[1]+" is: "+statusString, target);}); break;
-		case 'nbot': sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://mindcraft.si.eu.org/git/?p=nBot.git", target); break;
-		case 'help': if(ircMessageARGS[1] != null){sendCommandPRIVMSG(commandHelp("commandInfo", ircMessageARGS[1]), target);}else{sendCommandPRIVMSG(getHelp(), target)}; break;
-		case 'away': sendCommandWHO(target, function (data) {var ircGoneUsersRegex = new RegExp('([^ \r\n]+){1} G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(data[0])) != null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";};sendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away'), target);}); break;
-		case 'randomlittleface': getRandomLittleFace(target); break;
-		case 'np': printRadioStatus(target); break;
-		case 'raw': if(isOp(ircData[1]) == true) {ircConnection.write(ircMessageARGS[1]+'\r\n');}; break;
-		case 'savesettings': if(isOp(ircData[1]) == true) {fs.writeFile('settings.json', JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; console.log('It\'s saved!');});}; break;
-		case 'join': if(isOp(ircData[1]) == true) {settings.channels.arrayValueAdd(ircMessageARGS[1]);}; break;
-		case 'part': if(isOp(ircData[1]) == true) {settings.channels.arrayValueRemove(ircMessageARGS[1]);ircConnection.write('PART '+ircMessageARGS[1]+' :'+ircMessageARGS[2]+'\r\n');}; break;
-		case 'pass': if(isOp(ircData[1], false) == true && isOp(ircData[1]) == false) {if(ircMessageARGS[1] == settings.opUsers_password){sendCommandPRIVMSG('Success: Correct password', target);authenticatedOpUsers.arrayValueAdd(ircData[1]);}else{sendCommandPRIVMSG('Error: Wrong password', target);};}; break;
-		case 'logout': if(isOp(ircData[1]) == true) {authenticatedOpUsers.arrayValueRemove(ircData[1]);sendCommandPRIVMSG('Success: You have been de-authenticated', target);}; break;
-		case 'op': if(isOp(ircData[1]) == true) {sendCommandPRIVMSG(giveOp(ircMessageARGS[1]), target);}; break;
-		case 'deop': if(isOp(ircData[1]) == true) {sendCommandPRIVMSG(takeOp(ircMessageARGS[1]), target);}; break;
-		case 'helpall': ircSendEntireHelpToUser(ircData[1]); break;
-		case 'responseadd': if(isOp(ircData[1]) == true) {settings.specificResponses[ircMessageARGS[1]]=ircMessageARGS[2]}; break;
-		case 'responseremove': if(isOp(ircData[1]) == true) {delete settings.specificResponses[ircMessageARGS[1]]}; break;
-		case 'responseclear': if(isOp(ircData[1]) == true) {settings.specificResponses = {};}; break;
-	}
+	if (command.substr(0, settings.commandPrefix.length) == settings.commandPrefix) {
+		command = command.substr(settings.commandPrefix.length);
+		var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) == null) {target = ircData[1]};
+		switch (command) {
+			case 'hug': sendCommandPRIVMSG('*Hugs '+ircData[1]+'*', target); break;
+			case 'whereami': sendCommandPRIVMSG('wrong side of the internet', target); break;
+			case 'isup': if (ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (RegExp('open', 'g').exec(stdout) != null) {sendCommandPRIVMSG('starbound server is up', target);}else{sendCommandPRIVMSG('starbound server is down', target);};})}; break;
+			case 'echo': sendCommandPRIVMSG(ircMessageARGS[1].replaceSpecialChars(), target); break;
+			case 'view': http.get(ircMessageARGS[1], function(res) {res.on('data', function (chunk) {if(chunk.length < settings.command_request_maxBytes){sendCommandPRIVMSG(chunk, target);}});}).on('error', function(e) {sendCommandPRIVMSG("Got error: "+e.message, target);}); break;
+			case 'ping': pingTcpServer(ircMessageARGS[1], ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open"}else{statusString="closed"}sendCommandPRIVMSG("Port "+ircMessageARGS[2]+" on "+ircMessageARGS[1]+" is: "+statusString, target);}); break;
+			case 'nbot': sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://mindcraft.si.eu.org/git/?p=nBot.git", target); break;
+			case 'help': if(ircMessageARGS[1] != null){sendCommandPRIVMSG(commandHelp("commandInfo", ircMessageARGS[1]), target);}else{sendCommandPRIVMSG(getHelp(), target)}; break;
+			case 'away': sendCommandWHO(target, function (data) {var ircGoneUsersRegex = new RegExp('([^ \r\n]+){1} G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(data[0])) != null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";};sendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), target);}); break;
+			case 'randomlittleface': getRandomLittleFace(target); break;
+			case 'np': printRadioStatus(target); break;
+			case 'raw': if(isOp(ircData[1]) == true) {ircConnection.write(ircMessageARGS[1]+'\r\n');}; break;
+			case 'savesettings': if(isOp(ircData[1]) == true) {fs.writeFile('settings.json', JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; console.log('It\'s saved!');});}; break;
+			case 'join': if(isOp(ircData[1]) == true) {settings.channels.arrayValueAdd(ircMessageARGS[1]);}; break;
+			case 'part': if(isOp(ircData[1]) == true) {settings.channels.arrayValueRemove(ircMessageARGS[1]);ircConnection.write('PART '+ircMessageARGS[1]+' :'+ircMessageARGS[2]+'\r\n');}; break;
+			case 'pass': if(isOp(ircData[1], false) == true && isOp(ircData[1]) == false) {if(ircMessageARGS[1] == settings.opUsers_password){sendCommandPRIVMSG('Success: Correct password', target);authenticatedOpUsers.arrayValueAdd(ircData[1]);}else{sendCommandPRIVMSG('Error: Wrong password', target);};}; break;
+			case 'logout': if(isOp(ircData[1]) == true) {authenticatedOpUsers.arrayValueRemove(ircData[1]);sendCommandPRIVMSG('Success: You have been de-authenticated', target);}; break;
+			case 'op': if(isOp(ircData[1]) == true) {sendCommandPRIVMSG(giveOp(ircMessageARGS[1]), target);}; break;
+			case 'deop': if(isOp(ircData[1]) == true) {sendCommandPRIVMSG(takeOp(ircMessageARGS[1]), target);}; break;
+			case 'helpall': ircSendEntireHelpToUser(ircData[1]); break;
+			case 'responseadd': if(isOp(ircData[1]) == true) {settings.specificResponses[ircMessageARGS[1]]=ircMessageARGS[2]}; break;
+			case 'responseremove': if(isOp(ircData[1]) == true) {delete settings.specificResponses[ircMessageARGS[1]]}; break;
+			case 'responseclear': if(isOp(ircData[1]) == true) {settings.specificResponses = {};}; break;
+		}
+	};
 }
 
 //irc command functions
