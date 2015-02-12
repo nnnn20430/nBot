@@ -424,7 +424,7 @@ function responseHandlePRIVMSG(data) {
 	ircRelayServerEmitter.emit('newIrcMessage', data[1], data[2], data[3]);
 	console.log('['+data[2]+'] '+data[1]+': '+data[3]);
 	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+)(?:\\\\")*)+)(?:"))+|([^ ]+)+)+(?: ){0,1}', 'g');
-	while ((ircMessageARG = ircMessageARGRegex.exec(data[3])) !== null) {if(ircMessageARG[1] != null){console.log(ircMessageARG[1]);ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++};
+	while ((ircMessageARG = ircMessageARGRegex.exec(data[3])) !== null) {if(ircMessageARG[1] != null){ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++};
 	var target = data[2]; if (new RegExp('^#.*$').exec(data[2]) == null) {target = data[1]};
 	//process commands and such
 	botSimpleCommandHandle(data, ircMessageARGS);
