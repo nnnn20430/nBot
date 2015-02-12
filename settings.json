@@ -22,5 +22,6 @@
 	"opUsers_password": "",
 	"opUsers_mustBeChanOp": false,
 	"commandPrefix": ".",
-	"specificResponses": {}
+	"specificResponses": {},
+	"dynamicFunctions": {}
 }

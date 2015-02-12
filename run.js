@@ -301,7 +301,11 @@ function commandHelp(purpose, command) {
 		['helpall', 'helpall: prints help for all commands to the user'],
 		['responseadd', 'responseadd "trigger" "response": add a response to trigger (op only)'],
 		['responseremove', 'responseremove "trigger": remove a response from trigger (op only)'],
-		['responseclear', 'responsereclear: remove all set triggered responses (op only)']];
+		['responseclear', 'responsereclear: remove all set triggered responses (op only)'],
+		['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variables data=["nick","msgtarget","txt"] and ircMessageARGS which is an array with txt interpreted as arguments)'],
+		['functionremove', 'functionremove "name": remove a function named name (op only)'],
+		['functionlist', 'functionlist: prints list of functions (op only)'],
+		['functionshow', 'functionshow "name": prints the code of function named name (op only)']];
 	if (purpose == 'arrayOfCommands') {
 		var commandArray = [];
 		for (index in helpArray) {
@@ -359,8 +363,20 @@ function botSimpleCommandHandle(ircData, ircMessageARGS) {
 			case 'responseadd': if(isOp(ircData[1]) == true) {settings.specificResponses[ircMessageARGS[1]]=ircMessageARGS[2]}; break;
 			case 'responseremove': if(isOp(ircData[1]) == true) {delete settings.specificResponses[ircMessageARGS[1]]}; break;
 			case 'responseclear': if(isOp(ircData[1]) == true) {settings.specificResponses = {};}; break;
+			case 'functionadd': if(isOp(ircData[1]) == true) {settings.dynamicFunctions[ircMessageARGS[1]]=ircMessageARGS[2]}; break;
+			case 'functionremove': if(isOp(ircData[1]) == true) {delete settings.dynamicFunctions[ircMessageARGS[1]]}; break;
+			case 'functionlist': if(isOp(ircData[1]) == true) {var dynamicFunctionList=""; for (dynamicFunction in settings.dynamicFunctions) {dynamicFunctionList=dynamicFunction+", "};sendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), target);}; break;
+			case 'functionshow': if(isOp(ircData[1]) == true) {if ((dynamicFunction = settings.dynamicFunctions[ircMessageARGS[1]]) !== undefined) {sendCommandPRIVMSG(dynamicFunction, target);}else{sendCommandPRIVMSG("Error: Function not found", target);};}; break;
 		}
 	};
+}
+
+//misc functions: handle dynamic bot functions
+function botDynamicFunctionHandle(ircData, ircMessageARGS) {
+	for (dynamicFunction in settings.dynamicFunctions) {
+		dynamicFunction=eval("(function(data, ircMessageARGS){"+settings.dynamicFunctions[dynamicFunction]+"})");
+		dynamicFunction(ircData, ircMessageARGS);
+	}
 }
 
 //irc command functions
@@ -407,15 +423,16 @@ function sendCommandWHO(channel, callback) {
 function responseHandlePRIVMSG(data) {
 	ircRelayServerEmitter.emit('newIrcMessage', data[1], data[2], data[3]);
 	console.log('['+data[2]+'] '+data[1]+': '+data[3]);
-	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\"]+)(?:\\\\")*)+)(?:"))+|([^ ]+)+)+(?: )*', 'g');
-	while ((ircMessageARG = ircMessageARGRegex.exec(data[3])) !== null) {if(ircMessageARG[1] != null){ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++};
+	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+)(?:\\\\")*)+)(?:"))+|([^ ]+)+)+(?: ){0,1}', 'g');
+	while ((ircMessageARG = ircMessageARGRegex.exec(data[3])) !== null) {if(ircMessageARG[1] != null){console.log(ircMessageARG[1]);ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++};
 	var target = data[2]; if (new RegExp('^#.*$').exec(data[2]) == null) {target = data[1]};
 	//process commands and such
 	botSimpleCommandHandle(data, ircMessageARGS);
+	botDynamicFunctionHandle(data, ircMessageARGS);
 	if ((commandArgsWhereis = new RegExp('^'+settings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data[3])) != null) {sendCommandWHOIS(commandArgsWhereis[1], function(data){var channelArray=whoisParseChannels(data), channels=""; for (channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' '}};sendCommandPRIVMSG(data[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), target);});};
 	if (new RegExp('(Hi|Hello) '+settings.botName, 'gi').exec(data[3]) != null) {sendCommandPRIVMSG('Hi '+data[1], target);};
 	if (new RegExp('(?:'+settings.commandPrefix+'channelmsg|'+settings.commandPrefix+'cmsg|'+settings.commandPrefix+'chanmsg|'+settings.commandPrefix+'sendmsg)', 'gi').exec(ircMessageARGS[0])) {sendCommandPRIVMSG(ircMessageARGS[2].replaceSpecialChars(), ircMessageARGS[1]);};
-	if (RegExp('(?:djazz|nnnn20430|IcyDiamond)', 'gi').exec(data[1]) && new RegExp('(?:home time|home tiem)', 'gi').exec(data[3])) {sendCommandPRIVMSG('WOO HOME TIME!!!', target);};
+	if (RegExp('(?:djazz|nnnn20430|IcyDiamond)', 'gi').exec(data[1]) && new RegExp('(?:home time|home tiem)', 'gi').exec(data[3])) {sendCommandPRIVMSG('WOO! HOME TIME!!!', target);};
 	if ((specificResponse = settings.specificResponses[data[3]]) !== undefined) {sendCommandPRIVMSG(specificResponse, target);};
 }
 
@@ -431,8 +448,7 @@ function responseHandleWHO(data) {
 function responseHandleJOIN(data) {
 	if (data[1] != settings.botName){
 		sendCommandPRIVMSG('Hi '+data[1], data[4]);
-		if(data[3] == "Pony-jq9.9a2.149.49.IP"){sendCommandPRIVMSG('oh great its the same hostname as that Cindy girl "Pony-jq9.9a2.149.49.IP"', data[4]);};
-		if(data[1] == "nnnn20430"){sendCommandPRIVMSG('My Creator is back !!!', data[4]);};
+		if(data[1] == "nnnn20430"){sendCommandPRIVMSG('My Creator is back!!!', data[4]);};
 	};
 }
 
