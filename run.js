@@ -24,32 +24,123 @@ process.on('uncaughtException', function (err) {
 	console.log(err);
 });
 
-//handle terminal input
+//handle terminal
 var terminalLastChannel = settings.channels[0];
+var terminalBuffer = [""], terminalBufferCurrent = 0, terminalBufferMax = 10, terminalCursorPositionAbsolute=1, terminalBufferCurrentUnModifiedState = "";
 process.stdin.setEncoding('utf8');
+process.stdin.setRawMode(true);
+
+function terminalLog(data) {
+	process.stdout.write("\x1b[1G\x1b[K");
+	process.stdout.write(data);
+	process.stdout.write('\x0a');
+	terminalUpdateBuffer();
+}
+
+function terminalUpdateBuffer(){
+	process.stdout.write("\x1b[1G\x1b[2K");
+	process.stdout.write(terminalBuffer[terminalBufferCurrent].substr(terminalGetCursorPos()[1], process.stdout.columns));
+	process.stdout.write("\x1b["+terminalGetCursorPos()[0]+"G");
+}
+
+function terminalGetCursorPos(){
+	var positionAbsolute = terminalCursorPositionAbsolute-1;
+	var offsetCount = Math.floor(positionAbsolute/process.stdout.columns);
+	var adjustedOffsetCount = Math.floor((positionAbsolute+offsetCount)/process.stdout.columns);
+	var offsetRemainder = (positionAbsolute+adjustedOffsetCount)%process.stdout.columns;
+	var postionOffset = adjustedOffsetCount*process.stdout.columns-adjustedOffsetCount;
+	if (adjustedOffsetCount = 0) {offsetRemainder+=1;postionOffset-=1};
+	offsetRemainder+=1;
+	return [offsetRemainder, postionOffset];
+}
+
+function terminalProcessInput(chunk) {
+	if ((commandArgsRaw = new RegExp('/raw ([^\r\n]*)', 'g').exec(chunk)) != null) {
+		ircConnection.write(commandArgsRaw[1]+'\r\n');
+	}else if ((commandArgsJoin = new RegExp('/join (#[^\r\n]*)', 'g').exec(chunk)) != null) {
+		settings.channels.splice(settings.channels.lastIndexOf(settings.channels.slice(-1)[0])+1, 0, commandArgsJoin[1]);
+	}else if ((commandArgsPart = new RegExp('/part (#[^ \r\n]*)(?: ([^\r\n]*)+){0,1}', 'g').exec(chunk)) != null) {
+		var partReason = "Leaving";
+		if (commandArgsPart[2] != null) {partReason=commandArgsPart[2]}
+		settings.channels.splice(settings.channels.lastIndexOf(commandArgsPart[1]), 1);
+		ircConnection.write('PART '+commandArgsPart[1]+' :'+partReason+'\r\n');
+	}else if ((commandArgsChannel = new RegExp('(#[^ \r\n]*)+ ([^\r\n]*){1}', 'g').exec(chunk)) != null) {
+		ircConnection.write('PRIVMSG '+commandArgsChannel[1]+' :'+commandArgsChannel[2]+'\r\n');
+		terminalLastChannel = commandArgsChannel[1];
+	}else if ((commandArgsQuit = new RegExp('/quit(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) != null) {
+		var quitReason = commandArgsQuit[1]||"Leaving";
+		ircConnection.write('QUIT :'+quitReason+'\r\n');
+		terminalLog('quiting...');
+		setTimeout(function () {ircConnection.end();ircConnection.destroy();process.exit();}, 1000);
+	}else{
+		ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
+	}
+}
 
 process.stdin.on('readable', function() {
 	var chunk = process.stdin.read();
+	//console.log(chunk);
 	if (chunk !== null) {
-		if ((commandArgsRaw = new RegExp('/raw ([^\r\n]*)', 'g').exec(chunk)) != null) {
-			ircConnection.write(commandArgsRaw[1]+'\r\n');
-		}else if ((commandArgsJoin = new RegExp('/join (#[^\r\n]*)', 'g').exec(chunk)) != null) {
-			settings.channels.splice(settings.channels.lastIndexOf(settings.channels.slice(-1)[0])+1, 0, commandArgsJoin[1]);
-		}else if ((commandArgsPart = new RegExp('/part (#[^ \r\n]*)(?: ([^\r\n]*)+){0,1}', 'g').exec(chunk)) != null) {
-			var partReason = "Leaving";
-			if (commandArgsPart[2] != null) {partReason=commandArgsPart[2]}
-			settings.channels.splice(settings.channels.lastIndexOf(commandArgsPart[1]), 1);
-			ircConnection.write('PART '+commandArgsPart[1]+' :'+partReason+'\r\n');
-		}else if ((commandArgsChannel = new RegExp('(#[^ \r\n]*)+ ([^\r\n]*){1}', 'g').exec(chunk)) != null) {
-			ircConnection.write('PRIVMSG '+commandArgsChannel[1]+' :'+commandArgsChannel[2]+'\r\n');
-			terminalLastChannel = commandArgsChannel[1];
-		}else if ((commandArgsQuit = new RegExp('/quit(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) != null) {
-			var quitReason = commandArgsQuit[1]||"Leaving";
-			ircConnection.write('QUIT :'+quitReason+'\r\n');
-			console.log('quiting...');
+		if (chunk == "\x0d") {
+			//enter
+			process.stdout.write('\x0a');
+			var BufferData = terminalBuffer[terminalBufferCurrent];
+			if (terminalBuffer[terminalBufferCurrent] != "") {
+				terminalBuffer.splice(1, 0, terminalBuffer[terminalBufferCurrent]);
+				if (terminalBufferCurrent > 0) {
+					terminalBuffer[terminalBufferCurrent+1]=terminalBufferCurrentUnModifiedState;
+				}
+				terminalBuffer.splice((terminalBufferMax+1), 1);
+			};
+			terminalBufferCurrent=0;
+			terminalBuffer[0]="";
+			terminalCursorPositionAbsolute=1;
+			terminalUpdateBuffer();
+			terminalProcessInput(BufferData);
+		}else if (chunk == "\x7f") {
+			//backspace
+			terminalBuffer[terminalBufferCurrent]=terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-2))+terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
+			if (terminalCursorPositionAbsolute > 1) {
+				terminalCursorPositionAbsolute--;
+			}
+			terminalUpdateBuffer();
+		}else if (chunk == "\x1b\x5b\x41") {
+			//up arrow
+			if (terminalBufferCurrent < terminalBufferMax && terminalBuffer[terminalBufferCurrent+1] !== undefined) {
+				terminalBufferCurrent++;
+				terminalBufferCurrentUnModifiedState = terminalBuffer[terminalBufferCurrent];
+				terminalCursorPositionAbsolute=terminalBuffer[terminalBufferCurrent].length+1;
+				terminalUpdateBuffer();
+			}
+		}else if (chunk == "\x1b\x5b\x42") {
+			//down arrow
+			if (terminalBufferCurrent > 0) {
+				terminalBufferCurrent--;
+				terminalBufferCurrentUnModifiedState = terminalBuffer[terminalBufferCurrent];
+				terminalCursorPositionAbsolute=terminalBuffer[terminalBufferCurrent].length+1;
+				terminalUpdateBuffer();
+			}
+		}else if (chunk == "\x1b\x5b\x43") {
+			//right arrow
+			if (terminalBuffer[terminalBufferCurrent].length >= terminalCursorPositionAbsolute) {
+				terminalCursorPositionAbsolute++;
+			}
+			terminalUpdateBuffer();
+		}else if (chunk == "\x1b\x5b\x44") {
+			//left arrow
+			if (terminalCursorPositionAbsolute > 1) {
+				terminalCursorPositionAbsolute--;
+			}
+			terminalUpdateBuffer();
+		}else if (chunk == "\x03") {
+			//^C
+			ircConnection.write('QUIT :stdin received ^C\r\n');
+			terminalLog('quiting...');
 			setTimeout(function () {ircConnection.end();ircConnection.destroy();process.exit();}, 1000);
 		}else{
-			ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
+			terminalBuffer[terminalBufferCurrent]=terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-1))+chunk+terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
+			terminalCursorPositionAbsolute+=chunk.length;
+			terminalUpdateBuffer();
 		}
 	}
 });
@@ -118,14 +209,14 @@ function ircRelayMessageHandle(c) {
 
 function ircRelayServer(){
 	var server = net.createServer(function(c) { //'connection' listener
-		console.log('client connected to irc relay');
+		terminalLog('client connected to irc relay');
 		c.on('end', function() {
-			console.log('client disconnected from irc relay');
+			terminalLog('client disconnected from irc relay');
 		});
 		ircRelayMessageHandle(c);
 	});
 	server.listen(settings.ircRelayServerPort, function() { //'listening' listener
-		console.log('irc relay server bound!');
+		terminalLog('irc relay server bound!');
 	});
 }
 
@@ -145,7 +236,7 @@ function ircJoinMissingChannels(data) {
 	var missingChannels=settings.channels.diff(channelArray[0]);
 	for (channel in missingChannels){
 		if(settings.channels.hasOwnProperty(channel)){
-			console.log("joining channel: "+missingChannels[channel]);
+			terminalLog("joining channel: "+missingChannels[channel]);
 			ircConnection.write('JOIN '+missingChannels[channel]+'\r\n')
 		}
 		
@@ -352,7 +443,7 @@ function botSimpleCommandHandle(ircData, ircMessageARGS) {
 			case 'randomlittleface': getRandomLittleFace(target); break;
 			case 'np': printRadioStatus(target); break;
 			case 'raw': if(isOp(ircData[1]) == true) {ircConnection.write(ircMessageARGS[1]+'\r\n');}; break;
-			case 'savesettings': if(isOp(ircData[1]) == true) {fs.writeFile('settings.json', JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; console.log('It\'s saved!');});}; break;
+			case 'savesettings': if(isOp(ircData[1]) == true) {fs.writeFile('settings.json', JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; terminalLog('It\'s saved!');});}; break;
 			case 'join': if(isOp(ircData[1]) == true) {settings.channels.arrayValueAdd(ircMessageARGS[1]);}; break;
 			case 'part': if(isOp(ircData[1]) == true) {settings.channels.arrayValueRemove(ircMessageARGS[1]);ircConnection.write('PART '+ircMessageARGS[1]+' :'+ircMessageARGS[2]+'\r\n');}; break;
 			case 'pass': if(isOp(ircData[1], false) == true && isOp(ircData[1]) == false) {if(ircMessageARGS[1] == settings.opUsers_password){sendCommandPRIVMSG('Success: Correct password', target);authenticatedOpUsers.arrayValueAdd(ircData[1]);}else{sendCommandPRIVMSG('Error: Wrong password', target);};}; break;
@@ -384,7 +475,7 @@ function sendCommandPRIVMSG(data, to, timeout, forceTimeout){
 	var privmsgLenght = 512-(":"+settings.botName+"!"+ircBotWhoisHost[1]+"@"+ircBotWhoisHost[2]+" "+to+" :\r\n").length
 	var dataLengthRegExp = new RegExp('.{1,'+privmsgLenght+'}', 'g'), stringArray = [], c = 0, timeout=timeout||1000;
 	function writeData(data, to, c, timeout) {
-		setTimeout(function() {ircConnection.write('PRIVMSG '+to+' :'+data[c]+'\r\n'); c++; if (data[c] != null) {writeData(data, to, c, timeout)}; }, timeout)
+		setTimeout(function() {ircConnection.write('PRIVMSG '+to+' :'+data[c]+'\r\n'); c++; if (data[c] != null) {writeData(data, to, c, timeout)};}, timeout)
 	}
 	while ((string = dataLengthRegExp.exec(data)) !== null) {
 		stringArray[c]=string[0];c++
@@ -422,15 +513,15 @@ function sendCommandWHO(channel, callback) {
 //irc command handle functions
 function responseHandlePRIVMSG(data) {
 	ircRelayServerEmitter.emit('newIrcMessage', data[1], data[2], data[3]);
-	console.log('['+data[2]+'] '+data[1]+': '+data[3]);
-	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+)(?:\\\\")*)+)(?:"))+|([^ ]+)+)+(?: ){0,1}', 'g');
+	terminalLog('['+data[2]+'] '+data[1]+': '+data[3]);
+	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+)(?:(?:(?:\\\\)*(?!"))?(?:\\\\")?)*)+)(?:"))+|([^ ]+)+)+(?: )?', 'g');
 	while ((ircMessageARG = ircMessageARGRegex.exec(data[3])) !== null) {if(ircMessageARG[1] != null){ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++};
 	var target = data[2]; if (new RegExp('^#.*$').exec(data[2]) == null) {target = data[1]};
 	//process commands and such
 	botSimpleCommandHandle(data, ircMessageARGS);
 	botDynamicFunctionHandle(data, ircMessageARGS);
 	if ((commandArgsWhereis = new RegExp('^'+settings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data[3])) != null) {sendCommandWHOIS(commandArgsWhereis[1], function(data){var channelArray=whoisParseChannels(data), channels=""; for (channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' '}};sendCommandPRIVMSG(data[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), target);});};
-	if (new RegExp('(Hi|Hello) '+settings.botName, 'gi').exec(data[3]) != null) {sendCommandPRIVMSG('Hi '+data[1], target);};
+	if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data[3]) != null) {sendCommandPRIVMSG('Hi '+data[1], target);};
 	if (new RegExp('(?:'+settings.commandPrefix+'channelmsg|'+settings.commandPrefix+'cmsg|'+settings.commandPrefix+'chanmsg|'+settings.commandPrefix+'sendmsg)', 'gi').exec(ircMessageARGS[0])) {sendCommandPRIVMSG(ircMessageARGS[2].replaceSpecialChars(), ircMessageARGS[1]);};
 	if (RegExp('(?:djazz|nnnn20430|IcyDiamond)', 'gi').exec(data[1]) && new RegExp('(?:home time|home tiem)', 'gi').exec(data[3])) {sendCommandPRIVMSG('WOO! HOME TIME!!!', target);};
 	if ((specificResponse = settings.specificResponses[data[3]]) !== undefined) {sendCommandPRIVMSG(specificResponse, target);};
@@ -490,18 +581,18 @@ function ircDataReceiveHandle(data, ircConnection) {
 function initIrc() {
 	ircConnection = net.connect({port: settings.ircServerPort, host: settings.ircServer},
 		function() { //'connect' listener
-			console.log('connected to irc server!');
+			terminalLog('connected to irc server!');
 			ircConnection.setEncoding('utf8');
-			ircConnection.on('data', function(chunk) { if(chunk.match(/PING :([^\r\n]*)/) != null){ircConnection.write('PONG :'+chunk.match(/PING :([^\r\n]*)/)[1]+'\r\n')}else{ircDataReceiveHandle(chunk, ircConnection);};});
+			ircConnection.on('data', function(chunk) {if((pingMessage=chunk.match(/PING (?::)?([^\r\n]*)/)) != null){ircConnection.write('PONG :'+pingMessage[1]+'\r\n');}else{ircDataReceiveHandle(chunk, ircConnection);};});
 			if (settings.ircServerPassword != "") {ircConnection.write('PASS '+settings.ircServerPassword+'\r\n');};
 			ircConnection.write('NICK '+settings.botName+'\r\n');
 			ircConnection.write('USER '+settings.botName+' '+settings.hostName+' '+settings.ircServer+' :'+settings.botName+'\r\n');
-			console.log('waiting for server to complete connection registration');
-			ircConnectionRegistrationCompletedCheck = setInterval(function () {if(ircConnectionRegistrationCompleted){clearInterval(ircConnectionRegistrationCompletedCheck);console.log('joining channels...');sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});whoisIntervalLoop = setInterval(function () {sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});}, 5000);};}, 1000);
+			terminalLog('waiting for server to complete connection registration');
+			ircConnectionRegistrationCompletedCheck = setInterval(function () {if(ircConnectionRegistrationCompleted){clearInterval(ircConnectionRegistrationCompletedCheck);terminalLog('joining channels...');sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});whoisIntervalLoop = setInterval(function () {sendCommandWHOIS(settings.botName, function (data) {ircJoinMissingChannels(data);});}, 5000);};}, 1000);
 	});
 	ircConnection.setTimeout(60*1000);
-	ircConnection.on('error', function (e) {ircConnection.end();ircConnection.destroy();console.log("Got error: "+e.message);});
-	ircConnection.on('timeout', function (e) {ircConnection.end();ircConnection.destroy();console.log('connection timeout');});
+	ircConnection.on('error', function (e) {ircConnection.end();ircConnection.destroy();terminalLog("Got error: "+e.message);});
+	ircConnection.on('timeout', function (e) {ircConnection.end();ircConnection.destroy();terminalLog('connection timeout');});
 	ircConnection.on('close', function() {if(ircConnectionRegistrationCompleted){clearInterval(whoisIntervalLoop);}else{clearInterval(ircConnectionRegistrationCompletedCheck);}; setTimeout(function() {initIrc();}, 3000);});
 }
 
