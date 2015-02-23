@@ -20,7 +20,7 @@ var exec = require('child_process').exec;
 
 //handle wierd errors
 process.on('uncaughtException', function (err) {
-	console.log(err);
+	console.log(err.stack);
 });
 
 //clean old events
@@ -37,7 +37,9 @@ function botSettingsLoad(file, callback) {
 			fs.readFile(file, {"encoding": "utf8"}, function (err, data) {
 				if (err) throw err;
 				settings = JSON.parse(data);
-				callback(settings);
+				if (callback !== null) {
+					callback(settings);
+				}
 			});
 		} else if (err.code == "ENOENT"){
 			fs.writeFile(file, JSON.stringify({
@@ -70,7 +72,9 @@ function botSettingsLoad(file, callback) {
 function botSettingsSave(file, callback) {
 	file = file||"settings.json";
 	fs.writeFile(file, JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; terminalLog('Settings saved!');});
-	callback();
+	if (callback !== null) {
+		callback();
+	}
 }
 
 //handle terminal
@@ -109,8 +113,10 @@ function terminalProcessInput(chunk) {
 		if (commandArgsPart[2] != null) {partReason=commandArgsPart[2]}
 		settings.channels.splice(settings.channels.lastIndexOf(commandArgsPart[1]), 1);
 		ircConnection.write('PART '+commandArgsPart[1]+' :'+partReason+'\r\n');
-	}else if ((commandArgsChannel = new RegExp('(#[^ \r\n]*)+ ([^\r\n]*){1}', 'g').exec(chunk)) != null) {
-		ircConnection.write('PRIVMSG '+commandArgsChannel[1]+' :'+commandArgsChannel[2]+'\r\n');
+	}else if ((commandArgsChannel = new RegExp('(#[^ \r\n]*){1}(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) != null) {
+		if (commandArgsChannel[2] !== undefined) {
+			ircConnection.write('PRIVMSG '+commandArgsChannel[1]+' :'+commandArgsChannel[2]+'\r\n');
+		}
 		terminalLastChannel = commandArgsChannel[1];
 	}else if ((commandArgsQuit = new RegExp('/quit(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) != null) {
 		var quitReason = commandArgsQuit[1]||"Leaving";
@@ -506,8 +512,10 @@ function ircUpdateTrackedUsersFromWhoMessage(data) {
 //misc functions: is the user op on channel
 function isChanOp(user, channel){
 	var isChanOp = false;
-	if (ircChannelTrackedUsers[channel][user].mode.replace(/^(@|~|%|&)$/, "isOp") == "isOp" ) {isChanOp = true;};
-	if (ircChannelTrackedUsers[channel][user].isGlobalOP) {isChanOp = true;};
+	if (ircChannelTrackedUsers[channel] && ircChannelTrackedUsers[channel][user] && ircChannelTrackedUsers[channel][user].mode) {
+		if (ircChannelTrackedUsers[channel][user].mode.replace(/^(@|~|%|&)$/, "isOp") == "isOp" ) {isChanOp = true;};
+		if (ircChannelTrackedUsers[channel][user].isGlobalOP) {isChanOp = true;};
+	}
 	return isChanOp;
 }
 
@@ -585,7 +593,7 @@ function botSimpleCommandHandle(ircData, ircMessageARGS) {
 			case 'randomlittleface': getRandomLittleFace(target); break;
 			case 'np': printRadioStatus(target); break;
 			case 'raw': if(isOp(ircData[1]) == true) {ircConnection.write(ircMessageARGS[1]+'\r\n');}; break;
-			case 'savesettings': if(isOp(ircData[1]) == true) {fs.writeFile('settings.json', JSON.stringify(settings, null, '\t'), function (err) {if (err) throw err; terminalLog('It\'s saved!');});}; break;
+			case 'savesettings': if(isOp(ircData[1]) == true) {botSettingsSave();}; break;
 			case 'join': if(isOp(ircData[1]) == true) {settings.channels.arrayValueAdd(ircMessageARGS[1]);}; break;
 			case 'part': if(isOp(ircData[1]) == true) {settings.channels.arrayValueRemove(ircMessageARGS[1]);sendCommandPART(ircMessageARGS[1], ircMessageARGS[2]);} else if (isChanOp(ircData[1], target) == true && settings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(target);sendCommandPART(target);}; break;
 			case 'pass': if(isOp(ircData[1], false) == true && isOp(ircData[1]) == false) {if(ircMessageARGS[1] == settings.opUsers_password  && settings.opUsers_password != ""){sendCommandPRIVMSG('Success: Correct password', target);authenticatedOpUsers.arrayValueAdd(ircData[1]);}else{sendCommandPRIVMSG('Error: Wrong password', target);};}; break;
@@ -728,7 +736,7 @@ function responseHandleQUIT(data) {
 function responseHandleMODE(data) {
 	if ((user = data[3].split(' ')[1]) !== undefined){
 		var channel = data[2];
-		sendCommandWHOIS(user, function (data) {if ((mode = new RegExp('([^# \r\n]{0,2})#'+channel).exec(data)[1]) !== undefined) {ircChannelTrackedUsers[channel][user].mode = mode;};});
+		sendCommandWHOIS(user, function (data) {if ((mode = new RegExp('(?::| )([^# \r\n]{0,1})'+channel).exec(data[0])) !== null) {ircChannelTrackedUsers[channel][user].mode = mode[1];};});
 	}
 }
 
