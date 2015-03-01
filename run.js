@@ -633,7 +633,7 @@ function botDynamicFunctionHandle(ircData, ircMessageARGS) {
 		try {
 			dynamicFunction=eval("(function(data, ircMessageARGS){"+settings.dynamicFunctions[dynamicFunctionName]+"})");
 			dynamicFunction(ircData, ircMessageARGS);
-		}catch (e) {
+		} catch (e) {
 			terminalLog('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous');
 		}
 	}
@@ -772,9 +772,7 @@ function responseHandleNICK(data) {
 }
 
 function responseHandleKICK(data) {
-	if (data[1] != settings.botName){
-		delete ircChannelTrackedUsers[data[2]][data[3]];
-	}
+	delete ircChannelTrackedUsers[data[2]][data[3]];
 }
 
 //main irc data receiving function
@@ -785,16 +783,20 @@ function ircDataReceiveHandle(data, ircConnection) {
 	for (var line in ircMessageLines) {
 		line=ircMessageLines[line];
 		//parse single lines here
-		var ircCommandMessage = new RegExp(':([^! \r\n]+)!([^@ \r\n]+)@([^ \r\n]+) ([^ \r\n]+) ([^\r\n]*)', 'g').exec(line);
+		var ircCommandMessage = new RegExp(':([^! \r\n]+)!([^@ \r\n]+)@([^ \r\n]+) ([^ \r\n]+) ([^\r\n]*)', 'g').exec(line), ircMessageData;
 		if (ircCommandMessage !== null) {
-			switch (ircCommandMessage[4]) {
-					case 'PRIVMSG': var ircPRIVMSGdata = new RegExp('((?:#){0,1}[^ \r\n]+) :([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandlePRIVMSG([ircCommandMessage[0], ircCommandMessage[1]].concat(ircPRIVMSGdata.slice(1))); break;
-					case 'JOIN': var ircJOINdata = new RegExp('(?::){0,1}(#[^ \r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandleJOIN([ircCommandMessage[0], ircCommandMessage[1], ircCommandMessage[2], ircCommandMessage[3]].concat(ircJOINdata.slice(1))); break;
-					case 'PART': var ircPARTdata = new RegExp('((?:#){0,1}[^ \r\n]+)(?: :){0,1}([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandlePART([ircCommandMessage[0], ircCommandMessage[1], ircCommandMessage[2], ircCommandMessage[3]].concat(ircPARTdata.slice(1))); break;
-					case 'QUIT': var ircQUITdata = new RegExp(':([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandleQUIT([ircCommandMessage[0], ircCommandMessage[1]].concat(ircQUITdata.slice(1))); break;
-					case 'MODE': var ircMODEdata = new RegExp('([^ \r\n]*) ([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandleMODE([ircCommandMessage[0], ircCommandMessage[1]].concat(ircMODEdata.slice(1))); break;
-					case 'NICK': var ircNICKdata = new RegExp('([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandleNICK([ircCommandMessage[0], ircCommandMessage[1]].concat(ircNICKdata.slice(1))); break;
-					case 'KICK': var ircKICKdata = new RegExp('(#[^\r\n]*) ([^\r\n]*)', 'g').exec(ircCommandMessage[5]); responseHandleKICK([ircCommandMessage[0], ircCommandMessage[1]].concat(ircKICKdata.slice(1))); break;
+			try {
+				switch (ircCommandMessage[4]) {
+						case 'PRIVMSG': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1]].concat(new RegExp('((?:#){0,1}[^ \r\n]+) :([^\r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandlePRIVMSG(ircMessageData); break;
+						case 'JOIN': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1], ircCommandMessage[2], ircCommandMessage[3]].concat(new RegExp('(?::){0,1}(#[^ \r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandleJOIN(ircMessageData); break;
+						case 'PART': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1], ircCommandMessage[2], ircCommandMessage[3]].concat(new RegExp('((?:#){0,1}[^ \r\n]+)(?: :){0,1}([^\r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandlePART(ircMessageData); break;
+						case 'QUIT': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1]].concat(new RegExp(':([^\r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandleQUIT(ircMessageData); break;
+						case 'MODE': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1]].concat(new RegExp('([^ \r\n]*) ([^\r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandleMODE(ircMessageData); break;
+						case 'NICK': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1]].concat(new RegExp('([^\r\n]*)', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandleNICK(ircMessageData); break;
+						case 'KICK': ircMessageData = [ircCommandMessage[0], ircCommandMessage[1]].concat(new RegExp('(#[^ \r\n]*) ((?! :)[^\r\n]*) :[^\r\n]*', 'g').exec(ircCommandMessage[5]).slice(1)); responseHandleKICK(ircMessageData); break;
+				}
+			} catch (e) {
+				terminalLog('Error happend when processing server message: '+e);
 			}
 		}
 	}
