@@ -1,6 +1,10 @@
+/*jshint node: true*/
+
+"use strict";
+//variables
 var http = require('http');
 var net = require('net');
-var exec = require('child_process').exec
+var exec = require('child_process').exec;
 
 var botObj,
 	botF,
@@ -10,6 +14,27 @@ var botObj,
 	plugin = module.exports,
 	pluginFuncObj,
 	authenticatedOpUsers = [];
+	
+var settingsConstructor = function (modified) {
+	var settings, attrname;
+	if (this!==settingsConstructor) {
+		settings = {
+			command_request_maxBytes: 1024,
+			radioStatus_mpdServer: 'localhost',
+			radioStatus_mpdServerPort: 6600,
+			radioStatus_icecastStatsUrl: 'http://localhost:8000/status-json.xsl',
+			opUsers: { 'nnnn20430': '' },
+			opUsers_commandsAllowChanOp: false,
+			commandPrefix: '.',
+			handleConnectionErrors: true,
+			reactToJoinPart: true,
+			specificResponses: {},
+			dynamicFunctions: {}
+		};
+		for (attrname in modified) {settings[attrname]=modified[attrname];}
+		return settings;
+	}
+};
 
 //misc bot functions: ping the server by connecting and quickly closing
 function pingTcpServer(host, port, callback){
@@ -106,27 +131,27 @@ function printRadioStatus(channel) {
 function isOp(user, checkAuth){
 	var isOpUser = false;
 	if (checkAuth === undefined) {checkAuth=true;}
-	for (var opUser in pluginSettings.opUsers) {
-			if (user == pluginSettings.opUsers[opUser]) {
-				if (checkAuth === true) {
-					for (var authenticatedOpUser in authenticatedOpUsers) {
-							if (user == authenticatedOpUsers[authenticatedOpUser]) {isOpUser = true;}
-					}
-				}else if (checkAuth === false){
-					isOpUser = true;
-				}
+	if (pluginSettings.opUsers[user]) {
+		if (checkAuth === true) {
+			for (var authenticatedOpUser in authenticatedOpUsers) {
+					if (user == authenticatedOpUsers[authenticatedOpUser]) {isOpUser = true;}
 			}
+		}else if (checkAuth === false){
+			isOpUser = true;
+		}
 	}
 	return isOpUser;
 }
 
 //misc bot functions: give a user operator status
-function giveOp(user) {
+function giveOp(user, pass) {
 	var response = "Unknown Error happend";
-	if (isOp(user, false) === false) {
-		pluginSettings.opUsers.arrayValueAdd(user);
+	if (!user && !pass) {
+		response = "Error: User and password must be defined";
+	} else if (isOp(user, false) === false) {
+		pluginSettings.opUsers[user]=pass;
 		response = "Success: User is now an Operator";
-	}else{
+	} else {
 		response = "Error: User is already an Operator";
 	}
 	return response;
@@ -136,7 +161,7 @@ function giveOp(user) {
 function takeOp(user) {
 	var response = "Unknown Error happend";
 	if (isOp(user, false) === true) {
-		pluginSettings.opUsers.arrayValueRemove(user);
+		delete pluginSettings.opUsers[user];
 		plugin.authenticatedOpUsers.arrayValueRemove(user);
 		response = "Success: User is no longer an Operator";
 	}else{
@@ -146,13 +171,32 @@ function takeOp(user) {
 }
 
 //misc bot functions: authenticate user
-function authenticateOp(user, pass) {
-	//dymmy reminder
+function authenticateOp(user, pass, ignorePass) {
+	var response = "Unknown Error happend";
+	if(isOp(user, false) === true && isOp(user) === false) {
+		if(pass == pluginSettings.opUsers[user]  && pluginSettings.opUsers[user] !== ""){
+			response = "Success: Correct login";
+			authenticatedOpUsers.arrayValueAdd(user);
+		} else if (pluginSettings.opUsers[user] && ignorePass) {
+			response = "Success: Password ignored";
+			authenticatedOpUsers.arrayValueAdd(user);
+		} else {
+			response = "Error: Wrong username or password";
+		}
+	}
+	return response;
 }
 
 //misc bot functions: de-authenticate user
-function deAuthenticateOp(user, pass) {
-	//dymmy reminder
+function deAuthenticateOp(user) {
+	var response = "Unknown Error happend";
+	if(isOp(user) === true) {
+		response = "Success: User has been de-authenticated";
+		authenticatedOpUsers.arrayValueRemove(user);
+	} else {
+		response = "Success: User is not authenticated";
+	}
+	return response;
 }
 
 //misc bot functions: short help message
@@ -219,11 +263,29 @@ function botDynamicFunctionHandle(ircData, ircMessageARGS) {
 	var dynamicFunction;
 	for (var dynamicFunctionName in pluginSettings.dynamicFunctions) {
 		try {
-			dynamicFunction=eval("(function(data, ircMessageARGS){"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
+			dynamicFunction=eval("(function (data, ircMessageARGS) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
 			dynamicFunction(ircData, ircMessageARGS);
 		} catch (e) {
 			botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous');
 		}
+	}
+}
+
+//bot command handle functions: pluggable functions (to make it easier for plugins to add or remove functions)
+function botPluggableFunctionHandle(ircData, ircMessageARGS) {
+	var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) === null) {target = ircData[1];}
+	for (var pluggableFunction in plugin.botPluggableFunctionObject) {
+		plugin.botPluggableFunctionObject[pluggableFunction]({ircData: ircData, ircMessageARGS: ircMessageARGS, responseTarget: target});
+	}
+}
+
+//handle irc connection creation from bot
+function pluginHandleIrcConnectionCreation(ircConnection) {
+	if (pluginSettings.handleConnectionErrors) {
+		ircConnection.setTimeout(60*1000);
+		ircConnection.once('error', function (e) {ircConnection.end();ircConnection.destroy();botF.debugMsg("Got error: "+e.message);});
+		ircConnection.once('timeout', function (e) {ircConnection.end();ircConnection.destroy();botF.debugMsg('connection timeout');});
+		ircConnection.once('close', function() {setTimeout(function() {botF.initIrcBot();}, 3000);});
 	}
 }
 
@@ -236,24 +298,26 @@ function pluginHandlePRIVMSG(data) {
 	//process commands and such
 	botSimpleCommandHandle([rawmsg, from, to, message], ircMessageARGS);
 	botDynamicFunctionHandle([rawmsg, from, to, message], ircMessageARGS);
-	var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(message)) !== null) {botF.sendCommandWHOIS(commandArgsWhereis[1], function(data){var channelArray=botF.ircWhoisParseChannels(data), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.sendCommandPRIVMSG(data[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), target);});}
-	if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(message) !== null) {botF.sendCommandPRIVMSG('Hi '+from, target);}
+	botPluggableFunctionHandle([rawmsg, from, to, message], ircMessageARGS);
 	var specificResponse; if ((specificResponse = pluginSettings.specificResponses[message]) !== undefined) {botF.sendCommandPRIVMSG(specificResponse, target);}
-	if (new RegExp('\x01[^\x01]*\x01', 'g').exec(message) !== null) {botF.sendCommandPRIVMSG('I don\'t respond to CTCP requests.', target);}
 }
 
 //handle JOIN from bot
 function pluginHandleJOIN(data) {
 	if (data[1] != settings.botName){
-		botF.sendCommandPRIVMSG('Hi '+data[1], data[4]);
-		if(data[1] == "nnnn20430"){botF.sendCommandPRIVMSG('My Creator is back!!!', data[4]);}
+		if (pluginSettings.reactToJoinPart === true) {
+			botF.sendCommandPRIVMSG('Welcome '+data[1]+' to channel '+data[4], data[4]);
+		}
+		if(data[1] == "nnnn20430"){botF.sendCommandPRIVMSG('My Creator is here!!!', data[4]);}
 	}
 }
 
 //handle PART from bot
 function pluginHandlePART(data) {
 	if (data[1] != settings.botName){
-		botF.sendCommandPRIVMSG('Bye '+data[1], data[4]);
+		if (pluginSettings.reactToJoinPart === true) {
+			botF.sendCommandPRIVMSG('Goodbye '+data[1], data[4]);
+		}
 		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);botF.sendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data[1]);}
 	}
 }
@@ -264,7 +328,9 @@ function pluginHandleQUIT(data) {
 		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);}
 		for (var channel in ircChannelTrackedUsers) {
 			if (ircChannelTrackedUsers[channel][data[1]] !== undefined) {
-				botF.sendCommandPRIVMSG('Bye '+data[1], channel);
+				if (pluginSettings.reactToJoinPart === true) {
+					botF.sendCommandPRIVMSG('Goodbye '+data[1], channel);
+				}
 			}
 		}
 	}
@@ -314,7 +380,7 @@ module.exports.botCommandHelpArray = [
 	['savesettings', 'savesettings: save current settings to file (op only)'],
 	['join', 'join "#channel": make the bot join the channel (op only)'],
 	['part', 'part "#channel": make the bot part the channel (op only)'],
-	['pass', 'pass "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
+	['login', 'login "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
 	['logout', 'logout: de-authenticate (op only)'],
 	['op', 'op "user": give the user Operator status (op only)'],
 	['deop', 'deop "user": take Operator status from the user (op only)'],
@@ -346,8 +412,8 @@ module.exports.botSimpleCommandObject = {
 	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.sendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
 	part: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueRemove(data.ircMessageARGS[1]);botF.sendCommandPART(data.ircMessageARGS[1], data.ircMessageARGS[2]);} else if (isChanOp(data.ircData[1], data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.sendCommandPART(data.responseTarget);}},
-	pass: function (data) {if(isOp(data.ircData[1], false) === true && isOp(data.ircData[1]) === false) {if(data.ircMessageARGS[1] == pluginSettings.opUsers_password  && pluginSettings.opUsers_password !== ""){botF.sendCommandPRIVMSG('Success: Correct password', data.responseTarget);authenticatedOpUsers.arrayValueAdd(data.ircData[1]);}else{botF.sendCommandPRIVMSG('Error: Wrong password', data.responseTarget);}}},
-	logout: function (data) {if(isOp(data.ircData[1]) === true) {authenticatedOpUsers.arrayValueRemove(data.ircData[1]);botF.sendCommandPRIVMSG('Success: You have been de-authenticated', data.responseTarget);}},
+	login: function (data) {botF.sendCommandPRIVMSG(authenticateOp(data.ircData[1], data.ircMessageARGS[1]), data.responseTarget);},
+	logout: function (data) {botF.sendCommandPRIVMSG(deAuthenticateOp(data.ircData[1]), data.responseTarget);},
 	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(giveOp(data.ircMessageARGS[1]), data.responseTarget);}},
 	deop: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(takeOp(data.ircMessageARGS[1]), data.responseTarget);}},
 	helpall: function (data) {ircSendEntireHelpToUser(data.ircData[1]);},
@@ -361,38 +427,39 @@ module.exports.botSimpleCommandObject = {
 	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.sendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.sendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}}
 };
 
-//reserved functions
-module.exports.botEvent = function (eventData) {
-	switch (eventData.eventName) {
-		case 'botReceivedPRIVMSG': pluginHandlePRIVMSG(eventData.data); break;
-		case 'botReceivedJOIN': pluginHandleJOIN(eventData.data); break;
-		case 'botReceivedPART': pluginHandlePART(eventData.data); break;
-		case 'botReceivedQUIT': pluginHandleQUIT(eventData.data); break;
-		case 'botReceivedKICK': pluginHandleKICK(eventData.data); break;
-	}
-}
+module.exports.botPluggableFunctionObject = {
+	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.sendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channelArray=botF.ircWhoisParseChannels(whoisData), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.sendCommandPRIVMSG(whoisData[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
+	hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.sendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
+	ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.ircData[3]) !== null) {botF.sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);}}
+};
 
-module.exports.main = function (pluginName, nBotObject) {
-	botObj = nBotObject;
+//reserved functions
+
+//handle "botEvent" from bot (botEvent is used for irc related activity)
+module.exports.botEvent = function (event) {
+	switch (event.eventName) {
+		case 'botIrcConnectionCreated': pluginHandleIrcConnectionCreation(event.eventData); break;
+		case 'botReceivedPRIVMSG': pluginHandlePRIVMSG(event.eventData); break;
+		case 'botReceivedJOIN': pluginHandleJOIN(event.eventData); break;
+		case 'botReceivedPART': pluginHandlePART(event.eventData); break;
+		case 'botReceivedQUIT': pluginHandleQUIT(event.eventData); break;
+		case 'botReceivedKICK': pluginHandleKICK(event.eventData); break;
+	}
+};
+
+//main function called when plugin is loaded
+module.exports.main = function (passedData) {
+	//update variables
+	botObj = passedData.botObj;
 	botF = botObj.publicData.botFunctions;
 	settings = botObj.publicData.settings;
-	pluginSettings = settings.pluginsSettings[pluginName];
+	pluginSettings = settings.pluginsSettings[passedData.id];
 	ircChannelTrackedUsers = botObj.publicData.ircChannelTrackedUsers;
 	
+	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
-		pluginSettings = {
-			command_request_maxBytes: 1024,
-			radioStatus_mpdServer: 'localhost',
-			radioStatus_mpdServerPort: 6600,
-			radioStatus_icecastStatsUrl: 'http://localhost:8000/status-json.xsl',
-			opUsers: [],
-			opUsers_password: '',
-			opUsers_commandsAllowChanOp: false,
-			commandPrefix: '.',
-			specificResponses: {},
-			dynamicFunctions: {}
-		};
-		settings.pluginsSettings[pluginName] = pluginSettings;
+		pluginSettings = new settingsConstructor();
+		settings.pluginsSettings[passedData.id] = pluginSettings;
 		botF.botSettingsSave();
 	}
 };
