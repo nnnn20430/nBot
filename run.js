@@ -47,7 +47,8 @@ var settingsConstructor = {
 				ircServerPassword: '',
 				channels: [ 'mindcraft' ],
 				ircRelayServerEnabled: true,
-				plugins: ["core"],
+				ircMaxCommandResponseWaitQueue: 30,
+				plugins: [ 'core' ],
 				pluginsSettings: {}
 			};
 			for (attrname in modified) {connectionSettings[attrname]=modified[attrname];}
@@ -62,8 +63,6 @@ function botSettingsLoad(file, callback) {
 		if (!err) {
 			fs.readFile(file, {"encoding": "utf8"}, function (err, data) {
 				if (err) throw err;
-				var settings = JSON.parse(data);
-				connections = settings.connections;
 				if (callback !== undefined) {
 					callback(JSON.parse(data));
 				}
@@ -120,32 +119,43 @@ function terminalGetCursorPos(){
 }
 
 function terminalProcessInput(chunk) {
-	var terminalCommandArgs;
-	if ((terminalCommandArgs = new RegExp('/raw ([^\r\n]*)', 'g').exec(chunk)) !== null) {
-		connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');
-	}else if ((terminalCommandArgs = new RegExp('/join (#[^\r\n]*)', 'g').exec(chunk)) !== null) {
-		settings.channels.splice(settings.channels.lastIndexOf(settings.channels.slice(-1)[0])+1, 0, terminalCommandArgs[1]);
-	}else if ((terminalCommandArgs = new RegExp('/part (#[^ \r\n]*)(?: ([^\r\n]*)+){0,1}', 'g').exec(chunk)) !== null) {
+	var terminalCommandArgs = getArgsFromString(chunk)[0];
+	if (terminalCommandArgs[0] == '/raw') {connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');}
+	if (terminalCommandArgs[0] == '/join') {
+		var botIsInChannel = false;
+		for (var channel in connections[terminalCurrentConnection].channels) {if (connections[terminalCurrentConnection].channels[channel] == terminalCommandArgs[1]) {botIsInChannel = true;}}
+		if (!botIsInChannel) {connections[terminalCurrentConnection].channels.arrayValueAdd(terminalCommandArgs[1]);}
+	}
+	if (terminalCommandArgs[0] == '/part') {
 		var partReason = "Leaving";
 		if (terminalCommandArgs[2] !== undefined) {partReason=terminalCommandArgs[2];}
-		settings.channels.splice(settings.channels.lastIndexOf(terminalCommandArgs[1]), 1);
+		connections[terminalCurrentConnection].channels.arrayValueRemove(terminalCommandArgs[1]);
 		connectionsTmp[terminalCurrentConnection].ircConnection.write('PART '+terminalCommandArgs[1]+' :'+partReason+'\r\n');
-	}else if ((terminalCommandArgs = new RegExp('(#[^ \r\n]*){1}(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) !== null) {
+	}
+	if (terminalCommandArgs[0] == '/say') {
 		if (terminalCommandArgs[2] !== undefined) {
 			terminalLog('['+terminalCurrentConnection+':'+terminalCommandArgs[1]+'] '+connections[terminalCurrentConnection].botName+': '+terminalCommandArgs[2]);
 			connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalCommandArgs[1]+' :'+terminalCommandArgs[2]+'\r\n');
 		}
 		terminalLastChannel = terminalCommandArgs[1];
-	}else if ((terminalCommandArgs = new RegExp('/quit(?: ([^\r\n]*)){0,1}', 'g').exec(chunk)) !== null) {
+	}
+	if (terminalCommandArgs[0] == '/quit') {
 		var quitReason = terminalCommandArgs[1]||"Leaving";
 		killAllnBotInstances(quitReason);
 		terminalLog('quiting...');
 		setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
-	}else if ((terminalCommandArgs = new RegExp('/connection ([0-9]*)', 'g').exec(chunk)) !== null) {
-		if (connectionsTmp[terminalCommandArgs[1]] !== undefined) {
-			terminalCurrentConnection=terminalCommandArgs[1];
+	}
+	if (terminalCommandArgs[0] == '/connection') {
+		var connectionId = terminalCommandArgs[1];
+		for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
+		if (connectionsTmp[connectionId] !== undefined) {
+			terminalCurrentConnection = connectionId;
 		}
-	}else{
+	}
+	if (terminalCommandArgs[0] == '/fakemsg') {
+		connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
+	}
+	if (chunk.charAt(0) != '/') {
 		terminalLog('['+terminalCurrentConnection+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
 		connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
 	}
@@ -240,7 +250,7 @@ Object.defineProperty(Array.prototype, "diff", {
 
 Object.defineProperty(String.prototype, "replaceSpecialChars", { 
     value: function(a) {
-		return this.replace(/#c(?!si)/g, '\x03').replace(/#csi/g, '\x1B[').replace(new RegExp('#x([0-9a-fA-F]{2})', 'g'), function(regex, hex){return hex.fromHex();}).replace(new RegExp('#u([0-9a-fA-F]{4})', 'g'), function(regex, hex){return hex.fromUtf8Hex();});
+		return this.replace(/#csi;/g, '\x1B[').replace(/#c;/g, '\x03').replace(/#reset;/g, '\x0F').replace(/#underline;/g, '\x1F').replace(/#bold;/g, '\x02').replace(/#italic;/g, '\x16').replace(new RegExp('#x([0-9a-fA-F]{2});', 'g'), function(regex, hex){return hex.fromHex();}).replace(new RegExp('#u([0-9a-fA-F]{4});', 'g'), function(regex, hex){return hex.fromUtf8Hex();});
     },
     configurable: true,
     writable: true,
@@ -331,6 +341,13 @@ function decode_utf8(s) {
 
 //misc functions
 
+//misc functions: get shell like arguments from a string
+function getArgsFromString(str) {
+	var strARGS = {}, strARGC = 0, strARG, strARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+(?=(?:"|\\\\"|\\\\)))(?:(?:(?:\\\\)*(?!"))?(?:\\\\")?)*)+)(?:"))+|([^ ]+)+)+(?: )?', 'g');
+	while ((strARG = strARGRegex.exec(str)) !== null) {if(strARG[1] !== undefined){strARGS[strARGC]=strARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{strARGS[strARGC]=strARG[2];}strARGC++;}
+	return [strARGS, strARGC];
+}
+
 //misc functions: irc relay
 var ircRelayServerEmitter = new events.EventEmitter(); ircRelayServerEmitter.setMaxListeners(0);
 function ircRelayMessageHandle(c) {
@@ -404,21 +421,23 @@ function handleBotDebugMessageEvent(connection, data) {
 function nBot_instance(settings, globalSettings) {
 	var ircConnection;
 	var ircBotHost = "";
-	var ircChannelTrackedUsers = {};
-	var emitter = new events.EventEmitter(); emitter.setMaxListeners(32);
+	var ircChannelUsers = {};
+	var ircCommandReEventsEmitter = new events.EventEmitter(); ircCommandReEventsEmitter.setMaxListeners(settings.ircMaxCommandResponseWaitQueue+2);
+	var emitter = new events.EventEmitter(); emitter.setMaxListeners(0);
 	var privateData = {};
 	
-	//clean old events
-	emitter.on('newListener', function (data) {
-		var listeners = emitter.listeners(data);
-		while (listeners.length > 30) {emitter.removeListener(data, listeners[0]);listeners = emitter.listeners(data);}
+	//clean old command events
+	ircCommandReEventsEmitter.on('newListener', function (data) {
+		var listeners = ircCommandReEventsEmitter.listeners(data);
+		while (listeners.length > settings.ircMaxCommandResponseWaitQueue) {ircCommandReEventsEmitter.removeListener(data, listeners[0]);listeners = ircCommandReEventsEmitter.listeners(data);}
 	});
 	
 	//bot functions object
 	var botF = {
-		//exposed functions
+		//exposed local functions
 		botSettingsLoad: botSettingsLoad,
 		botSettingsSave: botSettingsSave,
+		getArgsFromString: getArgsFromString,
 		
 		//misc bot functions
 		
@@ -448,17 +467,20 @@ function nBot_instance(settings, globalSettings) {
 			}	
 		},
 		
-		//misc bot functions: parse channel who for user data
-		ircUpdateTrackedUsersFromWhoMessage: function (data) {
-			var regex = new RegExp('352 (?:[^ \r\n]* ){1}([^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) (H|G){1}(\\*){0,1}(@|\\+|~|%|&|!|-){0,1} :(?:[^\r\n]*)', 'g'), whoData, whoDataObject = {};
-			while ((whoData = regex.exec(data[0])) !== null) {
-				whoDataObject[whoData[2]] = {};
-				if ((ircChannelTrackedUsers[data[1]] && ircChannelTrackedUsers[data[1]][whoData[2]]) !== undefined) {whoDataObject[whoData[2]] = ircChannelTrackedUsers[data[1]][whoData[2]];}
-				if (whoData[3] !== undefined && whoData[3] == "H") {whoDataObject[whoData[2]].isHere = true;}else{whoDataObject[whoData[2]].isHere = false;}
-				if (whoData[4] !== undefined && whoData[4] == "*") {whoDataObject[whoData[2]].isGlobalOP = true;}else{whoDataObject[whoData[2]].isGlobalOP = false;}
-				if (whoData[5] !== undefined) {whoDataObject[whoData[2]].mode = whoData[5];}
+		//misc bot functions: update tracked user data in channel
+		ircUpdateUsersInChannel: function (channel) {
+			function ircUpdateTrackedUsersFromWhoMessage(data) {
+				var regex = new RegExp('352 (?:[^ \r\n]* ){1}([^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) (H|G){1}(\\*){0,1}(@|\\+|~|%|&|!|-){0,1} :(?:[^\r\n]*)', 'g'), whoData, whoDataObject = {};
+				while ((whoData = regex.exec(data[0])) !== null) {
+					whoDataObject[whoData[2]] = {};
+					if ((ircChannelUsers[data[1]] && ircChannelUsers[data[1]][whoData[2]]) !== undefined) {whoDataObject[whoData[2]] = ircChannelUsers[data[1]][whoData[2]];}
+					if (whoData[3] !== undefined && whoData[3] == "H") {whoDataObject[whoData[2]].isHere = true;}else{whoDataObject[whoData[2]].isHere = false;}
+					if (whoData[4] !== undefined && whoData[4] == "*") {whoDataObject[whoData[2]].isGlobalOP = true;}else{whoDataObject[whoData[2]].isGlobalOP = false;}
+					if (whoData[5] !== undefined) {whoDataObject[whoData[2]].mode = whoData[5];}else{whoDataObject[whoData[2]].mode = "";}
+				}
+				ircChannelUsers[data[1]] = whoDataObject;
 			}
-			ircChannelTrackedUsers[data[1]] = whoDataObject;
+			botF.sendCommandWHO(channel, function (data) {ircUpdateTrackedUsersFromWhoMessage(data);});
 		},
 		
 		//misc bot functions: handle post connection registation 
@@ -541,7 +563,7 @@ function nBot_instance(settings, globalSettings) {
 		sendCommandWHOIS: function (user, callback) {
 			ircConnection.write('WHOIS '+user+'\r\n');
 			function handleresponseWHOISEvent(user) {
-				emitter.once('responseWHOIS', function (data, dataString, dataArray) {
+				ircCommandReEventsEmitter.once('responseWHOIS', function (data, dataString, dataArray) {
 					if (data[1] == user) {
 						if (callback !== undefined) {callback(data, dataString, dataArray);}
 					}else{handleresponseWHOISEvent(user);}
@@ -553,7 +575,7 @@ function nBot_instance(settings, globalSettings) {
 		sendCommandWHO: function (channel, callback) {
 			ircConnection.write('WHO '+channel+'\r\n');
 			function handleresponseWHOEvent(channel) {
-				emitter.once('responseWHO', function (data, dataString, dataArray) {
+				ircCommandReEventsEmitter.once('responseWHO', function (data, dataString, dataArray) {
 					if (data[1] == channel) {
 						if (callback !== undefined) {callback(data, dataString, dataArray);}
 					}else{handleresponseWHOEvent(channel);}
@@ -564,7 +586,7 @@ function nBot_instance(settings, globalSettings) {
 		
 		sendCommandJOIN: function (channel) {
 			ircConnection.write('JOIN '+channel+'\r\n');
-			botF.sendCommandWHO(channel, function (data) {botF.ircUpdateTrackedUsersFromWhoMessage(data);});
+			botF.ircUpdateUsersInChannel(channel);
 		},
 		
 		sendCommandPART: function (channel, reason) {
@@ -593,7 +615,7 @@ function nBot_instance(settings, globalSettings) {
 				ircWHOISheader=ircWHOISheader.slice(1);
 				var data = [dataString].concat(ircWHOISheader);
 				if (ircWHOISheader[0] == settings.botName) {ircBotHost=ircWHOISheader[2];}
-				emitter.emit('responseWHOIS', data, dataString, dataArray);
+				ircCommandReEventsEmitter.emit('responseWHOIS', data, dataString, dataArray);
 			}
 		},
 		
@@ -602,30 +624,30 @@ function nBot_instance(settings, globalSettings) {
 			var channel = new RegExp('^[^ \r\n]* 352 '+settings.botName+' ([^ \r\n]+)').exec(dataArray[0]);
 			if (channel !== null) {
 				channel=channel.slice(1);
-				emitter.emit('responseWHO', [dataString].concat(channel), dataString, dataArray);
+				ircCommandReEventsEmitter.emit('responseWHO', [dataString].concat(channel), dataString, dataArray);
 			}
 		},
 		
 		responseHandleJOIN: function (data) {
 			botF.emitBotEvent('botReceivedJOIN', data);
 			if (data[1] != settings.botName){
-				botF.sendCommandWHO(data[4], function (data) {botF.ircUpdateTrackedUsersFromWhoMessage(data);});
+				botF.ircUpdateUsersInChannel(data[4]);
 			}
 		},
 		
 		responseHandlePART: function (data) {
 			botF.emitBotEvent('botReceivedPART', data);
 			if (data[1] != settings.botName){
-				delete ircChannelTrackedUsers[data[4]][data[1]];
+				delete ircChannelUsers[data[4]][data[1]];
 			}
 		},
 		
 		responseHandleQUIT: function (data) {
 			botF.emitBotEvent('botReceivedQUIT', data);
 			if (data[1] != settings.botName){
-				for (var channel in ircChannelTrackedUsers) {
-					if (ircChannelTrackedUsers[channel][data[1]] !== undefined) {
-						delete ircChannelTrackedUsers[channel][data[1]];
+				for (var channel in ircChannelUsers) {
+					if (ircChannelUsers[channel][data[1]] !== undefined) {
+						delete ircChannelUsers[channel][data[1]];
 					}
 				}
 			}
@@ -636,17 +658,17 @@ function nBot_instance(settings, globalSettings) {
 			var user, mode;
 			if ((user = data[5].split(' ')[1]) !== undefined){
 				var channel = data[2];
-				botF.sendCommandWHOIS(user, function (data) {if ((mode = new RegExp('(?::| )([^# \r\n]{0,1})'+channel).exec(data[0])) !== null) {ircChannelTrackedUsers[channel][user].mode = mode[1];}});
+				botF.sendCommandWHOIS(user, function (_, __, dataArray) {if ((mode = new RegExp('(?::| )([^# \r\n]{0,1})'+channel).exec(dataArray[0])) !== null) {ircChannelUsers[channel][user].mode = mode[1];}});
 			}
 		},
 		
 		responseHandleNICK: function (data) {
 			botF.emitBotEvent('botReceivedNICK', data);
 			if (data[1] != settings.botName){
-				for (var channel in ircChannelTrackedUsers) {
-					if (ircChannelTrackedUsers[channel][data[1]] !== undefined) {
-						ircChannelTrackedUsers[channel][data[4]]=ircChannelTrackedUsers[channel][data[1]];
-						delete ircChannelTrackedUsers[channel][data[1]];
+				for (var channel in ircChannelUsers) {
+					if (ircChannelUsers[channel][data[1]] !== undefined) {
+						ircChannelUsers[channel][data[4]]=ircChannelUsers[channel][data[1]];
+						delete ircChannelUsers[channel][data[1]];
 					}
 				}
 			}
@@ -655,7 +677,7 @@ function nBot_instance(settings, globalSettings) {
 		responseHandleKICK: function (data) {
 			botF.emitBotEvent('botReceivedKICK', data);
 			if (data[3] != settings.botName){
-				delete ircChannelTrackedUsers[data[4]][data[5]];
+				delete ircChannelUsers[data[4]][data[5]];
 			}
 		},
 		
@@ -753,13 +775,13 @@ function nBot_instance(settings, globalSettings) {
 	var nBotObject = {
 		init: botF.initIrcBot,
 		ircConnection: ircConnection,
-		botEventsEmitter: function () {var botEventsEmitter=new events.EventEmitter(); botEventsEmitter.setMaxListeners(0); return botEventsEmitter;}(),
-		kill: function () {ircConnection.end();ircConnection.destroy();},
+		botEventsEmitter: function () {var botEventsEmitter = new events.EventEmitter(); botEventsEmitter.setMaxListeners(0); return botEventsEmitter;}(),
+		kill: function () {ircConnection.end(); ircConnection.destroy();},
 		publicData: {
 			settings: settings,
 			globalSettings: globalSettings,
 			ircBotHost: ircBotHost,
-			ircChannelTrackedUsers: ircChannelTrackedUsers,
+			ircChannelUsers: ircChannelUsers,
 			botFunctions: botF
 		},
 		pluginData: {}
@@ -787,7 +809,7 @@ botSettingsLoad(null, function (data) {
 	for (var connection in connections) {
 		connectionsTmp[connection]=new nBot_instance(connections[connection], settings);
 		connectionsTmp[connection].init();
-		connectionsTmp[connection].botEventsEmitter.on('botEvent',  handleBotEvent.bind(undefined, connection));
-		connectionsTmp[connection].botEventsEmitter.on('botDebugMessage',  handleBotDebugMessageEvent.bind(undefined, connection));
+		connectionsTmp[connection].botEventsEmitter.on('botEvent', handleBotEvent.bind(undefined, connection));
+		connectionsTmp[connection].botEventsEmitter.on('botDebugMessage', handleBotDebugMessageEvent.bind(undefined, connection));
 	}
 });

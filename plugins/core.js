@@ -5,12 +5,13 @@
 var http = require('http');
 var net = require('net');
 var exec = require('child_process').exec;
+var events = require("events");
 
 var botObj,
 	botF,
 	settings,
 	pluginSettings,
-	ircChannelTrackedUsers,
+	ircChannelUsers,
 	plugin = module.exports,
 	pluginFuncObj,
 	authenticatedOpUsers = [];
@@ -213,9 +214,9 @@ function getHelp() {
 //misc bot functions: is the user op on channel
 function isChanOp(user, channel){
 	var isUserChanOp = false;
-	if (ircChannelTrackedUsers[channel] && ircChannelTrackedUsers[channel][user] && ircChannelTrackedUsers[channel][user].mode) {
-		if (ircChannelTrackedUsers[channel][user].mode.replace(/^(@|~|%|&)$/, "isOp") == "isOp" ) {isUserChanOp = true;}
-		if (ircChannelTrackedUsers[channel][user].isGlobalOP) {isUserChanOp = true;}
+	if (ircChannelUsers[channel] && ircChannelUsers[channel][user] && ircChannelUsers[channel][user].mode) {
+		if (ircChannelUsers[channel][user].mode.replace(/^(@|~|%|&)$/, "isOp") == "isOp" ) {isUserChanOp = true;}
+		if (ircChannelUsers[channel][user].isGlobalOP) {isUserChanOp = true;}
 	}
 	return isUserChanOp;
 }
@@ -292,8 +293,7 @@ function pluginHandleIrcConnectionCreation(ircConnection) {
 //handle PRIVMSG from bot
 function pluginHandlePRIVMSG(data) {
 	var rawmsg = data[0], from = data[1], to = data[4], message = data[5];
-	var ircMessageARGS = {}, ircMessageARGC = 0, ircMessageARG, ircMessageARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+(?=(?:"|\\\\"|\\\\)))(?:(?:(?:\\\\)*(?!"))?(?:\\\\")?)*)+)(?:"))+|([^ ]+)+)+(?: )?', 'g');
-	while ((ircMessageARG = ircMessageARGRegex.exec(message)) !== null) {if(ircMessageARG[1] !== undefined){ircMessageARGS[ircMessageARGC]=ircMessageARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{ircMessageARGS[ircMessageARGC]=ircMessageARG[2];}ircMessageARGC++;}
+	var ircMessageARGS = botF.getArgsFromString(message)[0];
 	var target = to; if (new RegExp('^#.*$').exec(to) === null) {target = from;}
 	//process commands and such
 	botSimpleCommandHandle([rawmsg, from, to, message], ircMessageARGS);
@@ -326,8 +326,8 @@ function pluginHandlePART(data) {
 function pluginHandleQUIT(data) {
 	if (data[1] != settings.botName){
 		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);}
-		for (var channel in ircChannelTrackedUsers) {
-			if (ircChannelTrackedUsers[channel][data[1]] !== undefined) {
+		for (var channel in ircChannelUsers) {
+			if (ircChannelUsers[channel][data[1]] !== undefined) {
 				if (pluginSettings.reactToJoinPart === true) {
 					botF.sendCommandPRIVMSG('Goodbye '+data[1], channel);
 				}
@@ -454,7 +454,7 @@ module.exports.main = function (passedData) {
 	botF = botObj.publicData.botFunctions;
 	settings = botObj.publicData.settings;
 	pluginSettings = settings.pluginsSettings[passedData.id];
-	ircChannelTrackedUsers = botObj.publicData.ircChannelTrackedUsers;
+	ircChannelUsers = botObj.publicData.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
