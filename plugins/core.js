@@ -6,6 +6,7 @@ var http = require('http');
 var net = require('net');
 var exec = require('child_process').exec;
 var events = require("events");
+var url = require('url');
 
 var botObj,
 	botF,
@@ -61,8 +62,11 @@ function getRandomLittleFace(channel) {
 	function getAcceptedImage(max, channel) {
 		var tryImgN = getRandomInt(1, max);
 		http.get('http://mylittlefacewhen.com/api/v3/face/?offset='+tryImgN+'&limit=1&format=json', function(res) {
-			res.on('data', function (chunk) {
-				var imgData = JSON.parse(chunk);
+			var data = '';
+			res.setEncoding('utf8');
+			res.on('data', function (chunk) {data += chunk;});
+			res.on('end', function () {
+				var imgData = JSON.parse(data);
 				if (imgData.objects[0].accepted){
 					var description = new RegExp('(.*)(?= reacting with) reacting with \'([^"]*?)(?=\',)').exec(imgData.objects[0].description);
 					botF.sendCommandPRIVMSG('Random mylittlefacewhen.com image: http://mylittlefacewhen.com/f/'+imgData.objects[0].id+' "'+description[1]+": "+description[2]+'"', channel);
@@ -71,8 +75,11 @@ function getRandomLittleFace(channel) {
 		}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
 	}
 	http.get('http://mylittlefacewhen.com/api/v3/face/?offset=1&limit=1&format=json', function(res) {
-		res.on('data', function (chunk) {
-			getAcceptedImage((JSON.parse(chunk).meta.total_count)-1, channel);
+		var data = '';
+		res.setEncoding('utf8');
+		res.on('data', function (chunk) {data += chunk;});
+		res.on('end', function () {
+			getAcceptedImage((JSON.parse(data).meta.total_count)-1, channel);
 		});
 	}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
 }
@@ -107,9 +114,11 @@ function printRadioStatus(channel) {
 		}
 		function getListeners() {
 			http.get(pluginSettings.radioStatus_icecastStatsUrl, function(res) {
+				var data = '';
 				res.setEncoding('utf8');
-				res.on('data', function (chunk) {
-					listeners=JSON.parse(chunk).icestats.source.listeners;
+				res.on('data', function (chunk) {data += chunk;});
+				res.on('end', function () {
+					listeners=JSON.parse(data).icestats.source.listeners;
 					getRadioStatus();
 				});
 			}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
@@ -163,7 +172,7 @@ function takeOp(user) {
 	var response = "Unknown Error happend";
 	if (isOp(user, false) === true) {
 		delete pluginSettings.opUsers[user];
-		plugin.authenticatedOpUsers.arrayValueRemove(user);
+		authenticatedOpUsers.arrayValueRemove(user);
 		response = "Success: User is no longer an Operator";
 	}else{
 		response = "Error: User is not an Operator";
@@ -382,7 +391,7 @@ module.exports.botCommandHelpArray = [
 	['part', 'part "#channel": make the bot part the channel (op only)'],
 	['login', 'login "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
 	['logout', 'logout: de-authenticate (op only)'],
-	['op', 'op "user": give the user Operator status (op only)'],
+	['op', 'op "user" "password": give the user Operator status (op only)'],
 	['deop', 'deop "user": take Operator status from the user (op only)'],
 	['helpall', 'helpall: prints help for all commands to the user'],
 	['responseadd', 'responseadd "trigger" "response": add a response to trigger (op only)'],
@@ -401,7 +410,7 @@ module.exports.botSimpleCommandObject = {
 	isup: function (data) {if (data.ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (new RegExp('open', 'g').exec(stdout) !== null) {botF.sendCommandPRIVMSG('starbound server is up', data.responseTarget);}else{botF.sendCommandPRIVMSG('starbound server is down', data.responseTarget);}});}},
 	echo: function (data) {botF.sendCommandPRIVMSG(data.ircMessageARGS[1].replaceSpecialChars(), data.responseTarget);},
 	sendmsg: function (data) {botF.sendCommandPRIVMSG(data.ircMessageARGS[2].replaceSpecialChars(), data.ircMessageARGS[1]);},
-	view: function (data) {http.get(data.ircMessageARGS[1], function(res) {res.on('data', function (chunk) {if(chunk.length < pluginSettings.command_request_maxBytes){botF.sendCommandPRIVMSG(chunk, data.responseTarget);}});}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});},
+	view: function (data) {if (data.ircMessageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.ircMessageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.sendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
 	ping: function (data) {pingTcpServer(data.ircMessageARGS[1], data.ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.sendCommandPRIVMSG("Port "+data.ircMessageARGS[2]+" on "+data.ircMessageARGS[1]+" is: "+statusString, data.responseTarget);});},
 	nbot: function (data) {botF.sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.sendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.sendCommandPRIVMSG(getHelp(), data.responseTarget);}},
@@ -414,7 +423,7 @@ module.exports.botSimpleCommandObject = {
 	part: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueRemove(data.ircMessageARGS[1]);botF.sendCommandPART(data.ircMessageARGS[1], data.ircMessageARGS[2]);} else if (isChanOp(data.ircData[1], data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.sendCommandPART(data.responseTarget);}},
 	login: function (data) {botF.sendCommandPRIVMSG(authenticateOp(data.ircData[1], data.ircMessageARGS[1]), data.responseTarget);},
 	logout: function (data) {botF.sendCommandPRIVMSG(deAuthenticateOp(data.ircData[1]), data.responseTarget);},
-	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(giveOp(data.ircMessageARGS[1]), data.responseTarget);}},
+	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(giveOp(data.ircMessageARGS[1], data.ircMessageARGS[2]), data.responseTarget);}},
 	deop: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(takeOp(data.ircMessageARGS[1]), data.responseTarget);}},
 	helpall: function (data) {ircSendEntireHelpToUser(data.ircData[1]);},
 	responseadd: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.specificResponses[data.ircMessageARGS[1]]=data.ircMessageARGS[2];}},

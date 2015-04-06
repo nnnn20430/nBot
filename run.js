@@ -361,6 +361,7 @@ function ircRelayMessageHandle(c) {
 
 function ircRelayServer(){
 	var server = net.createServer(function(c) { //'connection' listener
+		server.setEncoding('utf8');
 		debugLog('client connected to irc relay');
 		c.on('end', function() {
 			debugLog('client disconnected from irc relay');
