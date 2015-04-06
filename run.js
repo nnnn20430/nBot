@@ -605,7 +605,8 @@ function nBot_instance(settings, globalSettings) {
 		
 		//irc command handle functions
 		responseHandlePRIVMSG: function (data) {
-			botF.emitBotEvent('botReceivedPRIVMSG', data);
+			var privmsgArgs = data.slice(0, 4).concat(new RegExp('((?:#){0,1}[^ \r\n]+) :([^\r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedPRIVMSG', privmsgArgs);
 		},
 		
 		responseHandleWHOIS: function (dataString, dataArray) {
@@ -629,55 +630,62 @@ function nBot_instance(settings, globalSettings) {
 		},
 		
 		responseHandleJOIN: function (data) {
-			botF.emitBotEvent('botReceivedJOIN', data);
-			if (data[1] != settings.botName){
-				botF.ircUpdateUsersInChannel(data[4]);
+			var joinArgs = data.slice(0, 4).concat(new RegExp('(?::){0,1}(#[^ \r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedJOIN', joinArgs);
+			if (joinArgs[1] != settings.botName){
+				botF.ircUpdateUsersInChannel(joinArgs[4]);
 			}
 		},
 		
 		responseHandlePART: function (data) {
-			botF.emitBotEvent('botReceivedPART', data);
-			if (data[1] != settings.botName){
-				delete ircChannelUsers[data[4]][data[1]];
+			var partArgs = data.slice(0, 4).concat(new RegExp('((?:#){0,1}[^ \r\n]+)(?: :){0,1}([^\r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedPART', partArgs);
+			if (partArgs[1] != settings.botName){
+				delete ircChannelUsers[partArgs[4]][partArgs[1]];
 			}
 		},
 		
 		responseHandleQUIT: function (data) {
-			botF.emitBotEvent('botReceivedQUIT', data);
-			if (data[1] != settings.botName){
+			
+			var quitArgs = data.slice(0, 4).concat(new RegExp(':([^\r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedQUIT', quitArgs);
+			if (quitArgs[1] != settings.botName){
 				for (var channel in ircChannelUsers) {
-					if (ircChannelUsers[channel][data[1]] !== undefined) {
-						delete ircChannelUsers[channel][data[1]];
+					if (ircChannelUsers[channel][quitArgs[1]] !== undefined) {
+						delete ircChannelUsers[channel][quitArgs[1]];
 					}
 				}
 			}
 		},
 		
 		responseHandleMODE: function (data) {
-			botF.emitBotEvent('botReceivedMODE', data);
+			var modeArgs = data.slice(0, 4).concat(new RegExp('([^ \r\n]*) ([^\r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedMODE', modeArgs);
 			var user, mode;
-			if ((user = data[5].split(' ')[1]) !== undefined){
-				var channel = data[2];
+			if ((user = modeArgs[5].split(' ')[1]) !== undefined){
+				var channel = modeArgs[2];
 				botF.sendCommandWHOIS(user, function (_, __, dataArray) {if ((mode = new RegExp('(?::| )([^# \r\n]{0,1})'+channel).exec(dataArray[0])) !== null) {ircChannelUsers[channel][user].mode = mode[1];}});
 			}
 		},
 		
 		responseHandleNICK: function (data) {
-			botF.emitBotEvent('botReceivedNICK', data);
-			if (data[1] != settings.botName){
+			var nickArgs = data.slice(0, 4).concat(new RegExp('([^\r\n]*)').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedNICK', nickArgs);
+			if (nickArgs[1] != settings.botName){
 				for (var channel in ircChannelUsers) {
-					if (ircChannelUsers[channel][data[1]] !== undefined) {
-						ircChannelUsers[channel][data[4]]=ircChannelUsers[channel][data[1]];
-						delete ircChannelUsers[channel][data[1]];
+					if (ircChannelUsers[channel][nickArgs[1]] !== undefined) {
+						ircChannelUsers[channel][nickArgs[4]]=ircChannelUsers[channel][nickArgs[1]];
+						delete ircChannelUsers[channel][nickArgs[1]];
 					}
 				}
 			}
 		},
 		
 		responseHandleKICK: function (data) {
-			botF.emitBotEvent('botReceivedKICK', data);
-			if (data[3] != settings.botName){
-				delete ircChannelUsers[data[4]][data[5]];
+			var kickArgs = data.slice(0, 4).concat(new RegExp('(#[^ \r\n]*) ((?:(?! :)[^\r\n])*) :[^\r\n]*').exec(data[5]).slice(1));
+			botF.emitBotEvent('botReceivedKICK', kickArgs);
+			if (kickArgs[3] != settings.botName){
+				delete ircChannelUsers[kickArgs[4]][kickArgs[5]];
 			}
 		},
 		
@@ -690,17 +698,17 @@ function nBot_instance(settings, globalSettings) {
 				lineC = +lineC;
 				var line=ircMessageLines[lineC];
 				//parse single lines here
-				var ircCommandMessage = new RegExp(':([^! \r\n]+)!([^@ \r\n]+)@([^ \r\n]+) ([^ \r\n]+) ([^\r\n]*)', 'g').exec(line), msgArgRegex, ircMessageData;
+				var ircCommandMessage = new RegExp(':([^! \r\n]+)!([^@ \r\n]+)@([^ \r\n]+) ([^ \r\n]+) ([^\r\n]*)').exec(line), msgArgRegex, ircMessageData;
 				if (ircCommandMessage !== null) {
 					try {
 						switch (ircCommandMessage[4]) {
-								case 'PRIVMSG': msgArgRegex = new RegExp('((?:#){0,1}[^ \r\n]+) :([^\r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandlePRIVMSG(ircMessageData); break;
-								case 'JOIN': msgArgRegex = new RegExp('(?::){0,1}(#[^ \r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandleJOIN(ircMessageData); break;
-								case 'PART': msgArgRegex = new RegExp('((?:#){0,1}[^ \r\n]+)(?: :){0,1}([^\r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandlePART(ircMessageData); break;
-								case 'QUIT': msgArgRegex = new RegExp(':([^\r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandleQUIT(ircMessageData); break;
-								case 'MODE': msgArgRegex = new RegExp('([^ \r\n]*) ([^\r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandleMODE(ircMessageData); break;
-								case 'NICK': msgArgRegex = new RegExp('([^\r\n]*)', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandleNICK(ircMessageData); break;
-								case 'KICK': msgArgRegex = new RegExp('(#[^ \r\n]*) ((?:(?! :)[^\r\n])*) :[^\r\n]*', 'g'); ircMessageData = ircCommandMessage.slice(0, 4).concat(msgArgRegex.exec(ircCommandMessage[5]).slice(1)); botF.responseHandleKICK(ircMessageData); break;
+								case 'PRIVMSG': botF.responseHandlePRIVMSG(ircCommandMessage); break;
+								case 'JOIN': botF.responseHandleJOIN(ircCommandMessage); break;
+								case 'PART': botF.responseHandlePART(ircCommandMessage); break;
+								case 'QUIT': botF.responseHandleQUIT(ircCommandMessage); break;
+								case 'MODE': botF.responseHandleMODE(ircCommandMessage); break;
+								case 'NICK': botF.responseHandleNICK(ircCommandMessage); break;
+								case 'KICK': botF.responseHandleKICK(ircCommandMessage); break;
 						}
 					} catch (e) {
 						botF.debugMsg('Error happend when processing server message: ('+e+')');
