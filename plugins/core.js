@@ -155,7 +155,7 @@ function isOp(user, checkAuth){
 
 //misc bot functions: give a user operator status
 function giveOp(user, pass) {
-	var response = "Unknown Error happend";
+	var response = "Unknown error happened";
 	if (!user && !pass) {
 		response = "Error: User and password must be defined";
 	} else if (isOp(user, false) === false) {
@@ -169,12 +169,12 @@ function giveOp(user, pass) {
 
 //misc bot functions: take operator status from a user
 function takeOp(user) {
-	var response = "Unknown Error happend";
+	var response = "Unknown error happened";
 	if (isOp(user, false) === true) {
 		delete pluginSettings.opUsers[user];
 		authenticatedOpUsers.arrayValueRemove(user);
 		response = "Success: User is no longer an Operator";
-	}else{
+	} else {
 		response = "Error: User is not an Operator";
 	}
 	return response;
@@ -182,8 +182,8 @@ function takeOp(user) {
 
 //misc bot functions: authenticate user
 function authenticateOp(user, pass, ignorePass) {
-	var response = "Unknown Error happend";
-	if(isOp(user, false) === true && isOp(user) === false) {
+	var response = "Unknown error happened";
+	if (isOp(user, false) === true && isOp(user) === false) {
 		if(pass == pluginSettings.opUsers[user]  && pluginSettings.opUsers[user] !== ""){
 			response = "Success: Correct login";
 			authenticatedOpUsers.arrayValueAdd(user);
@@ -193,18 +193,18 @@ function authenticateOp(user, pass, ignorePass) {
 		} else {
 			response = "Error: Wrong username or password";
 		}
-	}
+	} else if (isOp(user) === true) {response = "Error: User is already authenticated";}
 	return response;
 }
 
 //misc bot functions: de-authenticate user
 function deAuthenticateOp(user) {
-	var response = "Unknown Error happend";
-	if(isOp(user) === true) {
+	var response = "Unknown error happened";
+	if (isOp(user) === true) {
 		response = "Success: User has been de-authenticated";
 		authenticatedOpUsers.arrayValueRemove(user);
 	} else {
-		response = "Success: User is not authenticated";
+		response = "Error: User is not authenticated";
 	}
 	return response;
 }

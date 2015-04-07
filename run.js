@@ -375,8 +375,8 @@ function ircRelayServerInit(){
 			debugLog('irc relay client "'+clientAddr+':'+clientPort+'" socket closed');
 		});
 		ircRelayWriteHandle(c);
-		debugLog('client "'+clientAddr+':'+clientPort+'" connected to irc relay');
 		setInterval(function () {if (pingTimeout === null) {c.write('PING\r\n'); pingTimeout = setTimeout(function () {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" ping timed out');}, 30*1000);}}, 10*1000);
+		debugLog('client "'+clientAddr+':'+clientPort+'" connected to irc relay');
 	});
 	server.listen(settings.ircRelayServerPort, function() { //'listening' listener
 		debugLog('irc relay server bound!');
@@ -525,7 +525,7 @@ function nBot_instance(settings, globalSettings) {
 						try {
 							nBotObject.pluginData[id].botEvent(data);
 						} catch (e) {
-							botF.debugMsg('Error happend when passing botEvent "'+data.eventName+'" to plugin "'+id+'": ('+e+')');
+							botF.debugMsg('Error happened when passing botEvent "'+data.eventName+'" to plugin "'+id+'": ('+e+')');
 						}
 						pluginHandleBotEvent(id);
 					}
@@ -539,7 +539,7 @@ function nBot_instance(settings, globalSettings) {
 						pluginHandleBotEvent(id);
 					}
 				} catch (e) {
-					botF.debugMsg('Error happend when loading plugin "'+id+'": ('+e+')');
+					botF.debugMsg('Error happened when loading plugin "'+id+'": ('+e+')');
 				}
 			})();
 		},
@@ -550,7 +550,7 @@ function nBot_instance(settings, globalSettings) {
 				nBotObject.pluginData[id].botEvent({eventName: 'botPluginDisableEvent', eventData: 'disable'});
 				delete nBotObject.pluginData[id];
 			} catch (e) {
-				botF.debugMsg('Error happend when disabling plugin "'+id+'": ('+e+')');
+				botF.debugMsg('Error happened when disabling plugin "'+id+'": ('+e+')');
 			}
 		},
 		
@@ -723,7 +723,7 @@ function nBot_instance(settings, globalSettings) {
 								case 'KICK': botF.ircResponseHandleKICK(ircCommandMessage); break;
 						}
 					} catch (e) {
-						botF.debugMsg('Error happend when processing server message: ('+e+')');
+						botF.debugMsg('Error happened when processing server message: ('+e+')');
 					}
 				}
 				var ircMultilineMessageNumeric, ircMultilineMessageMaxLines=30;
