@@ -5,7 +5,7 @@
 var http = require('http');
 var net = require('net');
 var exec = require('child_process').exec;
-var events = require("events");
+var events = require('events');
 var url = require('url');
 
 var botObj,
@@ -54,7 +54,7 @@ function ircSendEntireHelpToUser(user) {
 	for (var command in commandArray) {
 		commandString=commandString+pluginSettings.commandPrefix+commandHelp('commandInfo', commandArray[command])+'\n';
 	}
-	botF.sendCommandPRIVMSG('Help for all commands:\n'+commandString, user);
+	botF.ircSendCommandPRIVMSG('Help for all commands:\n'+commandString, user);
 }
 
 //misc bot functions: get random img from mylittlefacewhen.com
@@ -69,10 +69,10 @@ function getRandomLittleFace(channel) {
 				var imgData = JSON.parse(data);
 				if (imgData.objects[0].accepted){
 					var description = new RegExp('(.*)(?= reacting with) reacting with \'([^"]*?)(?=\',)').exec(imgData.objects[0].description);
-					botF.sendCommandPRIVMSG('Random mylittlefacewhen.com image: http://mylittlefacewhen.com/f/'+imgData.objects[0].id+' "'+description[1]+": "+description[2]+'"', channel);
+					botF.ircSendCommandPRIVMSG('Random mylittlefacewhen.com image: http://mylittlefacewhen.com/f/'+imgData.objects[0].id+' "'+description[1]+": "+description[2]+'"', channel);
 				}else if (imgData.objects[0].accepted === false){getAcceptedImage(max, channel);}
 			});
-		}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
+		}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
 	}
 	http.get('http://mylittlefacewhen.com/api/v3/face/?offset=1&limit=1&format=json', function(res) {
 		var data = '';
@@ -81,7 +81,7 @@ function getRandomLittleFace(channel) {
 		res.on('end', function () {
 			getAcceptedImage((JSON.parse(data).meta.total_count)-1, channel);
 		});
-	}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
+	}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
 }
 
 //misc bot functions: get random int
@@ -109,8 +109,8 @@ function printRadioStatus(channel) {
 					});
 			});
 			mpdConnection.setTimeout(10000);
-			mpdConnection.on('error', function (e) {mpdConnection.end();mpdConnection.destroy();botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
-			mpdConnection.on('timeout', function (e) {mpdConnection.end();mpdConnection.destroy();botF.sendCommandPRIVMSG("Got error: Connection Timeout", channel);});
+			mpdConnection.on('error', function (e) {mpdConnection.end();mpdConnection.destroy();botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
+			mpdConnection.on('timeout', function (e) {mpdConnection.end();mpdConnection.destroy();botF.ircSendCommandPRIVMSG("Got error: Connection Timeout", channel);});
 		}
 		function getListeners() {
 			http.get(pluginSettings.radioStatus_icecastStatsUrl, function(res) {
@@ -121,7 +121,7 @@ function printRadioStatus(channel) {
 					listeners=JSON.parse(data).icestats.source.listeners;
 					getRadioStatus();
 				});
-			}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, channel);});
+			}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
 		}
 		if (currentsong === undefined) {
 			getCurrentSong();
@@ -130,7 +130,7 @@ function printRadioStatus(channel) {
 		}else {
 			var RegExCurrentSong=new RegExp('file: .*?(?=[^/\n]+\n)([^/\n]+)\n').exec(currentsong);
 			if (RegExCurrentSong !== null) {
-				botF.sendCommandPRIVMSG('Now Playing: '+RegExCurrentSong[1].replace(/\.[^.]*$/, '')+' | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/', channel);
+				botF.ircSendCommandPRIVMSG('Now Playing: '+RegExCurrentSong[1].replace(/\.[^.]*$/, '')+' | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/', channel);
 			}
 		}
 	}
@@ -308,16 +308,16 @@ function pluginHandlePRIVMSG(data) {
 	botSimpleCommandHandle([rawmsg, from, to, message], ircMessageARGS);
 	botDynamicFunctionHandle([rawmsg, from, to, message], ircMessageARGS);
 	botPluggableFunctionHandle([rawmsg, from, to, message], ircMessageARGS);
-	var specificResponse; if ((specificResponse = pluginSettings.specificResponses[message]) !== undefined) {botF.sendCommandPRIVMSG(specificResponse, target);}
+	var specificResponse; if ((specificResponse = pluginSettings.specificResponses[message]) !== undefined) {botF.ircSendCommandPRIVMSG(specificResponse, target);}
 }
 
 //handle JOIN from bot
 function pluginHandleJOIN(data) {
 	if (data[1] != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
-			botF.sendCommandPRIVMSG('Welcome '+data[1]+' to channel '+data[4], data[4]);
+			botF.ircSendCommandPRIVMSG('Welcome '+data[1]+' to channel '+data[4], data[4]);
 		}
-		if(data[1] == "nnnn20430"){botF.sendCommandPRIVMSG('My Creator is here!!!', data[4]);}
+		if(data[1] == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data[4]);}
 	}
 }
 
@@ -325,9 +325,9 @@ function pluginHandleJOIN(data) {
 function pluginHandlePART(data) {
 	if (data[1] != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
-			botF.sendCommandPRIVMSG('Goodbye '+data[1], data[4]);
+			botF.ircSendCommandPRIVMSG('Goodbye '+data[1], data[4]);
 		}
-		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);botF.sendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data[1]);}
+		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);botF.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data[1]);}
 	}
 }
 
@@ -338,7 +338,7 @@ function pluginHandleQUIT(data) {
 		for (var channel in ircChannelUsers) {
 			if (ircChannelUsers[channel][data[1]] !== undefined) {
 				if (pluginSettings.reactToJoinPart === true) {
-					botF.sendCommandPRIVMSG('Goodbye '+data[1], channel);
+					botF.ircSendCommandPRIVMSG('Goodbye '+data[1], channel);
 				}
 			}
 		}
@@ -348,7 +348,7 @@ function pluginHandleQUIT(data) {
 //handle KICK from bot
 function pluginHandleKICK(data) {
 	if (data[4] != settings.botName){
-		if(isOp(data[4])){authenticatedOpUsers.arrayValueRemove(data[3]);botF.sendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data[3]);}
+		if(isOp(data[4])){authenticatedOpUsers.arrayValueRemove(data[3]);botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data[3]);}
 	}
 }
 
@@ -405,41 +405,41 @@ module.exports.botCommandHelpArray = [
 ];
 
 module.exports.botSimpleCommandObject = {
-	hug: function (data) {botF.sendCommandPRIVMSG('*Hugs '+data.ircData[1]+'*', data.responseTarget);},
-	whereami: function (data) {botF.sendCommandPRIVMSG('wrong side of the internet', data.responseTarget);},
-	isup: function (data) {if (data.ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (new RegExp('open', 'g').exec(stdout) !== null) {botF.sendCommandPRIVMSG('starbound server is up', data.responseTarget);}else{botF.sendCommandPRIVMSG('starbound server is down', data.responseTarget);}});}},
-	echo: function (data) {botF.sendCommandPRIVMSG(data.ircMessageARGS[1].replaceSpecialChars(), data.responseTarget);},
-	sendmsg: function (data) {botF.sendCommandPRIVMSG(data.ircMessageARGS[2].replaceSpecialChars(), data.ircMessageARGS[1]);},
-	view: function (data) {if (data.ircMessageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.ircMessageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.sendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.sendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
-	ping: function (data) {pingTcpServer(data.ircMessageARGS[1], data.ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.sendCommandPRIVMSG("Port "+data.ircMessageARGS[2]+" on "+data.ircMessageARGS[1]+" is: "+statusString, data.responseTarget);});},
-	nbot: function (data) {botF.sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
-	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.sendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.sendCommandPRIVMSG(getHelp(), data.responseTarget);}},
-	away: function (data) {botF.sendCommandWHO(data.responseTarget, function (whoData) {var ircGoneUsersRegex = new RegExp('352 (?:[^ \r\n]* )(?:[^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(whoData[0])) !== null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";}botF.sendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
+	hug: function (data) {botF.ircSendCommandPRIVMSG('*Hugs '+data.ircData[1]+'*', data.responseTarget);},
+	whereami: function (data) {botF.ircSendCommandPRIVMSG('wrong side of the internet', data.responseTarget);},
+	isup: function (data) {if (data.ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (new RegExp('open', 'g').exec(stdout) !== null) {botF.ircSendCommandPRIVMSG('starbound server is up', data.responseTarget);}else{botF.ircSendCommandPRIVMSG('starbound server is down', data.responseTarget);}});}},
+	echo: function (data) {botF.ircSendCommandPRIVMSG(data.ircMessageARGS[1].replaceSpecialChars(), data.responseTarget);},
+	sendmsg: function (data) {botF.ircSendCommandPRIVMSG(data.ircMessageARGS[2].replaceSpecialChars(), data.ircMessageARGS[1]);},
+	view: function (data) {if (data.ircMessageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.ircMessageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
+	ping: function (data) {pingTcpServer(data.ircMessageARGS[1], data.ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.ircSendCommandPRIVMSG("Port "+data.ircMessageARGS[2]+" on "+data.ircMessageARGS[1]+" is: "+statusString, data.responseTarget);});},
+	nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
+	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(getHelp(), data.responseTarget);}},
+	away: function (data) {botF.ircSendCommandWHO(data.responseTarget, function (whoData) {var ircGoneUsersRegex = new RegExp('352 (?:[^ \r\n]* )(?:[^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(whoData[0])) !== null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";}botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
 	randomlittleface: function (data) {getRandomLittleFace(data.responseTarget);},
 	np: function (data) {printRadioStatus(data.responseTarget);},
 	raw: function (data) {if(isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.ircMessageARGS[1]+'\r\n');}},
-	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.sendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
+	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
-	part: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueRemove(data.ircMessageARGS[1]);botF.sendCommandPART(data.ircMessageARGS[1], data.ircMessageARGS[2]);} else if (isChanOp(data.ircData[1], data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.sendCommandPART(data.responseTarget);}},
-	login: function (data) {botF.sendCommandPRIVMSG(authenticateOp(data.ircData[1], data.ircMessageARGS[1]), data.responseTarget);},
-	logout: function (data) {botF.sendCommandPRIVMSG(deAuthenticateOp(data.ircData[1]), data.responseTarget);},
-	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(giveOp(data.ircMessageARGS[1], data.ircMessageARGS[2]), data.responseTarget);}},
-	deop: function (data) {if(isOp(data.ircData[1]) === true) {botF.sendCommandPRIVMSG(takeOp(data.ircMessageARGS[1]), data.responseTarget);}},
+	part: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueRemove(data.ircMessageARGS[1]);botF.ircSendCommandPART(data.ircMessageARGS[1], data.ircMessageARGS[2]);} else if (isChanOp(data.ircData[1], data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.ircSendCommandPART(data.responseTarget);}},
+	login: function (data) {botF.ircSendCommandPRIVMSG(authenticateOp(data.ircData[1], data.ircMessageARGS[1]), data.responseTarget);},
+	logout: function (data) {botF.ircSendCommandPRIVMSG(deAuthenticateOp(data.ircData[1]), data.responseTarget);},
+	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(giveOp(data.ircMessageARGS[1], data.ircMessageARGS[2]), data.responseTarget);}},
+	deop: function (data) {if(isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(takeOp(data.ircMessageARGS[1]), data.responseTarget);}},
 	helpall: function (data) {ircSendEntireHelpToUser(data.ircData[1]);},
 	responseadd: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.specificResponses[data.ircMessageARGS[1]]=data.ircMessageARGS[2];}},
 	responseremove: function (data) {if(isOp(data.ircData[1]) === true) {delete pluginSettings.specificResponses[data.ircMessageARGS[1]];}},
-	responselist: function (data) {if(isOp(data.ircData[1]) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}botF.sendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
+	responselist: function (data) {if(isOp(data.ircData[1]) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}botF.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
 	reponseclear: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.specificResponses = {};}},
 	functionadd: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]=data.ircMessageARGS[2];}},
 	functionremove: function (data) {if(isOp(data.ircData[1]) === true) {delete pluginSettings.dynamicFunctions[data.ircMessageARGS[1]];}},
-	functionlist: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.sendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
-	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.sendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.sendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}}
+	functionlist: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
+	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}}
 };
 
 module.exports.botPluggableFunctionObject = {
-	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.sendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channelArray=botF.ircWhoisParseChannels(whoisData), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.sendCommandPRIVMSG(whoisData[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
-	hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.sendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
-	ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.ircData[3]) !== null) {botF.sendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);}}
+	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channelArray=botF.ircWhoisParseChannels(whoisData), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.ircSendCommandPRIVMSG(whoisData[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
+	hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
+	ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);}}
 };
 
 //reserved functions
