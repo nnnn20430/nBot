@@ -10,14 +10,14 @@ var url = require('url');
 
 var botObj;
 var pluginId;
-var	botF;
-var	settings;
-var	pluginSettings;
-var	ircChannelUsers;
-var	plugin = module.exports;
-var	pluginFuncObj;
-var	authenticatedOpUsers = [];
-var	addedBotSimpleCommandsOrigin = {};
+var botF;
+var settings;
+var pluginSettings;
+var ircChannelUsers;
+var plugin = module.exports;
+var pluginFuncObj;
+var authenticatedOpUsers = [];
+var addedBotSimpleCommandsOrigin = {};
 
 //settings constructor
 var settingsConstructor = function (modified) {

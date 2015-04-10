@@ -10,12 +10,12 @@ var url = require('url');
 
 var botObj;
 var pluginId;
-var	botF;
-var	settings;
-var	pluginSettings;
-var	ircChannelUsers;
-var	plugin = module.exports;
-var	pluginFuncObj;
+var botF;
+var settings;
+var pluginSettings;
+var ircChannelUsers;
+var plugin = module.exports;
+var pluginFuncObj;
 
 //settings constructor
 var settingsConstructor = function (modified) {
@@ -132,6 +132,6 @@ module.exports.main = function (passedData) {
 	corePlugin.botSimpleCommandAdd('mpd_play', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('play '+(+data.ircMessageARGS[1]-1));}}, 'mpd_playid "pos": plays the song at position', pluginId);
 	corePlugin.botSimpleCommandAdd('mpd_random', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('random '+data.ircMessageARGS[1]);}}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
 	corePlugin.botSimpleCommandAdd('mpd_prio', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('prio '+data.ircMessageARGS[1]+' '+(+data.ircMessageARGS[2]-1));}}, 'mpd_prio "priority" "pos": sets priotiry (0 - 255) of song at pos in random mode', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('random 1\nprio 0 0\nprio '+(+data.ircMessageARGS[1]-1));}}, 'mpd_queue_song "pos": queues song at pos (enables random mode)', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('random 1\nprio 0 0\nprio 255 '+(+data.ircMessageARGS[1]-1));}}, 'mpd_queue_song "pos": queues song at pos (enables random mode)', pluginId);
 	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand(data.ircMessageARGS[1]);}}, 'mpd_raw "command": send command to mpd)', pluginId);
 };
