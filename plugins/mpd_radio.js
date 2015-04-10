@@ -25,6 +25,7 @@ var settingsConstructor = function (modified) {
 			mpdServer: 'localhost',
 			mpdServerPort: 6600,
 			mpdServerPassword: '',
+			mpdCommandsOpOnly: true,
 			icecastStatsUrl: 'http://localhost:8000/status-json.xsl'
 		};
 		for (attrname in modified) {settings[attrname]=modified[attrname];}
@@ -128,10 +129,44 @@ module.exports.main = function (passedData) {
 	
 	//add commands to core plugin
 	var corePlugin = botObj.pluginData.core;
-	corePlugin.botSimpleCommandAdd('np', function (data) {getNowPlaying(function (response) {botF.ircSendCommandPRIVMSG(response, data.responseTarget);});}, 'np: shows currently playing song on the radio', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_play', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('play '+(+data.ircMessageARGS[1]-1));}}, 'mpd_playid "pos": plays the song at position', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_random', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('random '+data.ircMessageARGS[1]);}}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_prio', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('prio '+data.ircMessageARGS[1]+' '+(+data.ircMessageARGS[2]-1));}}, 'mpd_prio "priority" "pos": sets priotiry (0 - 255) of song at pos in random mode', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand('random 1\nprio 0 0\nprio 255 '+(+data.ircMessageARGS[1]-1));}}, 'mpd_queue_song "pos": queues song at pos (enables random mode)', pluginId);
-	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {if (corePlugin.isOp(data.ircData[1])) {mpdSendCommand(data.ircMessageARGS[1]);}}, 'mpd_raw "command": send command to mpd)', pluginId);
+	corePlugin.botSimpleCommandAdd('np', function (data) {
+		getNowPlaying(function (response) {
+			botF.ircSendCommandPRIVMSG(response, data.responseTarget);
+		});
+	}, 'np: shows currently playing song on the radio', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_play', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('play '+(+data.ircMessageARGS[1]-1));
+		}
+	}, 'mpd_playid "pos": plays the song at position', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_random', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('random '+data.ircMessageARGS[1]);
+		}
+	}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_prio', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('prio '+data.ircMessageARGS[1]+' '+(+data.ircMessageARGS[2]-1));
+		}
+	}, 'mpd_prio "priority" "pos": sets priotiry (0 - 255) of song at pos in random mode', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+				var pos = +data.ircMessageARGS[1]-1, endpos = +data.ircMessageARGS[2], prio = 255;
+				if (!data.ircMessageARGS[2]) {
+					mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
+				} else {
+					var commandString = 'random 1\nprio 0 -1';
+					while (pos < endpos && prio > 0) {
+						commandString += '\nprio '+prio+' '+pos;
+						pos++; prio--;
+					}
+					mpdSendCommand(commandString);
+				}
+		}
+	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
+	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand(data.ircMessageARGS[1]);
+		}
+	}, 'mpd_raw "command": send command to mpd)', pluginId);
 };

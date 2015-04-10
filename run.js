@@ -46,7 +46,7 @@ var settingsConstructor = {
 				ircServer: 'localhost',
 				ircServerPort: 6667,
 				ircServerPassword: '',
-				channels: [ 'mindcraft' ],
+				channels: [ '#nBot' ],
 				ircRelayServerEnabled: true,
 				ircMaxCommandResponseWaitQueue: 30,
 				plugins: [ 'core' ],
@@ -72,10 +72,8 @@ function botSettingsLoad(file, callback) {
 			fs.writeFile(file, JSON.stringify(new settingsConstructor.main({
 				connections: [new settingsConstructor.connection({
 					channels: [
-						'#mindcraft',
-						'#BronyTalkTest',
-						'#BronyTalk',
-						'#parasprite'
+						'#nBot',
+						'#mindcraft'
 					]
 				})]
 			}), null, '\t'), function (err) {if (err) throw err; botSettingsLoad(file, callback);});

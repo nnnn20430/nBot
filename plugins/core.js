@@ -54,39 +54,12 @@ function pingTcpServer(host, port, callback){
 }
 
 //misc plugin functions: return entire help
-function ircSendEntireHelpToUser(user) {
+function getHelpAll() {
 	var commandArray = commandHelp('arrayOfCommands'), commandString = "";
 	for (var command in commandArray) {
 		commandString=commandString+pluginSettings.commandPrefix+commandHelp('commandInfo', commandArray[command])+'\n';
 	}
-	botF.ircSendCommandPRIVMSG('Help for all commands:\n'+commandString, user);
-}
-
-//misc plugin functions: get random img from mylittlefacewhen.com
-function getRandomLittleFace(channel) {
-	function getAcceptedImage(max, channel) {
-		var tryImgN = getRandomInt(1, max);
-		http.get('http://mylittlefacewhen.com/api/v3/face/?offset='+tryImgN+'&limit=1&format=json', function(res) {
-			var data = '';
-			res.setEncoding('utf8');
-			res.on('data', function (chunk) {data += chunk;});
-			res.on('end', function () {
-				var imgData = JSON.parse(data);
-				if (imgData.objects[0].accepted){
-					var description = new RegExp('(.*)(?= reacting with) reacting with \'([^"]*?)(?=\',)').exec(imgData.objects[0].description);
-					botF.ircSendCommandPRIVMSG('Random mylittlefacewhen.com image: http://mylittlefacewhen.com/f/'+imgData.objects[0].id+' "'+description[1]+": "+description[2]+'"', channel);
-				}else if (imgData.objects[0].accepted === false){getAcceptedImage(max, channel);}
-			});
-		}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
-	}
-	http.get('http://mylittlefacewhen.com/api/v3/face/?offset=1&limit=1&format=json', function(res) {
-		var data = '';
-		res.setEncoding('utf8');
-		res.on('data', function (chunk) {data += chunk;});
-		res.on('end', function () {
-			getAcceptedImage((JSON.parse(data).meta.total_count)-1, channel);
-		});
-	}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
+	return 'Help for all commands:\n'+commandString;
 }
 
 //misc plugin functions: get random int
@@ -271,6 +244,7 @@ function botSimpleCommandRemove(command) {
 function botSimpleCommandOrigin(command) {
 	var response = pluginId;
 	if (addedBotSimpleCommandsOrigin[command] !== undefined) {response = addedBotSimpleCommandsOrigin[command];}
+	return response;
 }
 
 //bot command handle functions: handle dynamic bot functions
@@ -363,8 +337,7 @@ function pluginHandleKICK(data) {
 //export functions
 pluginFuncObj = {
 	pingTcpServer: pingTcpServer,
-	ircSendEntireHelpToUser: ircSendEntireHelpToUser,
-	getRandomLittleFace: getRandomLittleFace,
+	getHelpAll: getHelpAll,
 	getRandomInt: getRandomInt,
 	isOp: isOp,
 	giveOp: giveOp,
@@ -380,11 +353,10 @@ pluginFuncObj = {
 };
 for (var name in pluginFuncObj) {module.exports[name] = pluginFuncObj[name];}
 
+//bot simple commands help object
 module.exports.botCommandHelpArray = [
 	['hug', 'hug: gives you a free hug'],
-	['whereami', 'whereami: tells you where you are'],
 	['whereis', 'whereis "user": lists the channels the user is in (the command can contain anything between where and is)'],
-	['isup starbound', 'isup starbound: checks if my starbound server on mindcraft.si.eu.org is up'],
 	['echo', 'echo "string": prints string back to the chat'],
 	['sendmsg', 'sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)'],
 	['view', 'view "url": prints the data located at the url, data must not be bigger than 1KiB'],
@@ -392,7 +364,6 @@ module.exports.botCommandHelpArray = [
 	['nbot', 'nbot: prints some info about nBot'],
 	['help', 'help: prints help message'],
 	['away', 'away: prints a list of away users in the channel'],
-	['randomlittleface', 'randomlittleface: get random image from mylittlefacewhen.com'],
 	['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
 	['savesettings', 'savesettings: save current settings to file (op only)'],
 	['join', 'join "#channel": make the bot join the channel (op only)'],
@@ -412,10 +383,9 @@ module.exports.botCommandHelpArray = [
 	['functionshow', 'functionshow "name": prints the code of function named name (op only)']
 ];
 
+//bot simple commands object
 module.exports.botSimpleCommandObject = {
 	hug: function (data) {botF.ircSendCommandPRIVMSG('*Hugs '+data.ircData[1]+'*', data.responseTarget);},
-	whereami: function (data) {botF.ircSendCommandPRIVMSG('wrong side of the internet', data.responseTarget);},
-	isup: function (data) {if (data.ircMessageARGS[1] == "starbound") {exec("nmap mindcraft.si.eu.org -p 21025", function(error, stdout, stderr){if (new RegExp('open', 'g').exec(stdout) !== null) {botF.ircSendCommandPRIVMSG('starbound server is up', data.responseTarget);}else{botF.ircSendCommandPRIVMSG('starbound server is down', data.responseTarget);}});}},
 	echo: function (data) {botF.ircSendCommandPRIVMSG(data.ircMessageARGS[1].replaceSpecialChars(), data.responseTarget);},
 	sendmsg: function (data) {botF.ircSendCommandPRIVMSG(data.ircMessageARGS[2].replaceSpecialChars(), data.ircMessageARGS[1]);},
 	view: function (data) {if (data.ircMessageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.ircMessageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
@@ -423,7 +393,6 @@ module.exports.botSimpleCommandObject = {
 	nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(getHelp(), data.responseTarget);}},
 	away: function (data) {botF.ircSendCommandWHO(data.responseTarget, function (whoData) {var ircGoneUsersRegex = new RegExp('352 (?:[^ \r\n]* )(?:[^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(whoData[0])) !== null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";}botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
-	randomlittleface: function (data) {getRandomLittleFace(data.responseTarget);},
 	raw: function (data) {if(isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.ircMessageARGS[1]+'\r\n');}},
 	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
@@ -432,7 +401,7 @@ module.exports.botSimpleCommandObject = {
 	logout: function (data) {botF.ircSendCommandPRIVMSG(deAuthenticateOp(data.ircData[1]), data.responseTarget);},
 	op: function (data) {if(isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(giveOp(data.ircMessageARGS[1], data.ircMessageARGS[2]), data.responseTarget);}},
 	deop: function (data) {if(isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(takeOp(data.ircMessageARGS[1]), data.responseTarget);}},
-	helpall: function (data) {ircSendEntireHelpToUser(data.ircData[1]);},
+	helpall: function (data) {botF.ircSendCommandPRIVMSG(getHelpAll(), data.ircData[1]);},
 	responseadd: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.specificResponses[data.ircMessageARGS[1]]=data.ircMessageARGS[2];}},
 	responseremove: function (data) {if(isOp(data.ircData[1]) === true) {delete pluginSettings.specificResponses[data.ircMessageARGS[1]];}},
 	responselist: function (data) {if(isOp(data.ircData[1]) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}botF.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
@@ -443,6 +412,7 @@ module.exports.botSimpleCommandObject = {
 	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}}
 };
 
+//bot pluggable functions object
 module.exports.botPluggableFunctionObject = {
 	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channelArray=botF.ircWhoisParseChannels(whoisData), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.ircSendCommandPRIVMSG(whoisData[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
 	hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
