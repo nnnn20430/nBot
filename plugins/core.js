@@ -8,15 +8,18 @@ var exec = require('child_process').exec;
 var events = require('events');
 var url = require('url');
 
-var botObj,
-	botF,
-	settings,
-	pluginSettings,
-	ircChannelUsers,
-	plugin = module.exports,
-	pluginFuncObj,
-	authenticatedOpUsers = [];
-	
+var botObj;
+var pluginId;
+var	botF;
+var	settings;
+var	pluginSettings;
+var	ircChannelUsers;
+var	plugin = module.exports;
+var	pluginFuncObj;
+var	authenticatedOpUsers = [];
+var	addedBotSimpleCommandsOrigin = {};
+
+//settings constructor
 var settingsConstructor = function (modified) {
 	var settings, attrname;
 	if (this!==settingsConstructor) {
@@ -24,10 +27,10 @@ var settingsConstructor = function (modified) {
 			command_request_maxBytes: 1024,
 			radioStatus_mpdServer: 'localhost',
 			radioStatus_mpdServerPort: 6600,
-			radioStatus_icecastStatsUrl: 'http://localhost:8000/status-json.xsl',
 			opUsers: { 'nnnn20430': '' },
 			opUsers_commandsAllowChanOp: false,
 			commandPrefix: '.',
+			commandPrefixIgnoreOnDirect: false,
 			handleConnectionErrors: true,
 			reactToJoinPart: true,
 			specificResponses: {},
@@ -38,7 +41,9 @@ var settingsConstructor = function (modified) {
 	}
 };
 
-//misc bot functions: ping the server by connecting and quickly closing
+//misc plugin functions
+
+//misc plugin functions: ping the server by connecting and quickly closing
 function pingTcpServer(host, port, callback){
 	function returnResults(data) {callback(data);}
 	var pingHost = net.connect({port: port, host: host}, function () {
@@ -48,7 +53,7 @@ function pingTcpServer(host, port, callback){
 	pingHost.on('error', function () {pingHost.end();pingHost.destroy();returnResults(false);});
 }
 
-//misc bot functions: return entire help
+//misc plugin functions: return entire help
 function ircSendEntireHelpToUser(user) {
 	var commandArray = commandHelp('arrayOfCommands'), commandString = "";
 	for (var command in commandArray) {
@@ -57,7 +62,7 @@ function ircSendEntireHelpToUser(user) {
 	botF.ircSendCommandPRIVMSG('Help for all commands:\n'+commandString, user);
 }
 
-//misc bot functions: get random img from mylittlefacewhen.com
+//misc plugin functions: get random img from mylittlefacewhen.com
 function getRandomLittleFace(channel) {
 	function getAcceptedImage(max, channel) {
 		var tryImgN = getRandomInt(1, max);
@@ -84,60 +89,12 @@ function getRandomLittleFace(channel) {
 	}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
 }
 
-//misc bot functions: get random int
+//misc plugin functions: get random int
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-//misc bot functions: radio status
-function printRadioStatus(channel) {
-	var currentsong, listeners;
-	function getRadioStatus() {
-		function getCurrentSong() {
-			var mpdConnection = net.connect({port: pluginSettings.radioStatus_mpdServerPort, host: pluginSettings.radioStatus_mpdServer},
-				function() { //'connect' listener
-					mpdConnection.setEncoding('utf8');
-					mpdConnection.write('currentsong\n');
-					mpdConnection.on('data', function (data) {
-						if (data == new RegExp('OK MPD [^\n]*\n').exec(data)){
-							//nothing
-						}else{
-							currentsong=data;
-							mpdConnection.end();mpdConnection.destroy();
-							getRadioStatus();
-						}
-					});
-			});
-			mpdConnection.setTimeout(10000);
-			mpdConnection.on('error', function (e) {mpdConnection.end();mpdConnection.destroy();botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
-			mpdConnection.on('timeout', function (e) {mpdConnection.end();mpdConnection.destroy();botF.ircSendCommandPRIVMSG("Got error: Connection Timeout", channel);});
-		}
-		function getListeners() {
-			http.get(pluginSettings.radioStatus_icecastStatsUrl, function(res) {
-				var data = '';
-				res.setEncoding('utf8');
-				res.on('data', function (chunk) {data += chunk;});
-				res.on('end', function () {
-					listeners=JSON.parse(data).icestats.source.listeners;
-					getRadioStatus();
-				});
-			}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, channel);});
-		}
-		if (currentsong === undefined) {
-			getCurrentSong();
-		}else if (listeners === undefined) {
-			getListeners();
-		}else {
-			var RegExCurrentSong=new RegExp('file: .*?(?=[^/\n]+\n)([^/\n]+)\n').exec(currentsong);
-			if (RegExCurrentSong !== null) {
-				botF.ircSendCommandPRIVMSG('Now Playing: '+RegExCurrentSong[1].replace(/\.[^.]*$/, '')+' | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/', channel);
-			}
-		}
-	}
-	getRadioStatus();
-}
-
-//misc bot functions: is the user op
+//misc plugin functions: is the user op
 function isOp(user, checkAuth){
 	var isOpUser = false;
 	if (checkAuth === undefined) {checkAuth=true;}
@@ -153,7 +110,7 @@ function isOp(user, checkAuth){
 	return isOpUser;
 }
 
-//misc bot functions: give a user operator status
+//misc plugin functions: give a user operator status
 function giveOp(user, pass) {
 	var response = "Unknown error happened";
 	if (!user && !pass) {
@@ -167,7 +124,7 @@ function giveOp(user, pass) {
 	return response;
 }
 
-//misc bot functions: take operator status from a user
+//misc plugin functions: take operator status from a user
 function takeOp(user) {
 	var response = "Unknown error happened";
 	if (isOp(user, false) === true) {
@@ -180,7 +137,7 @@ function takeOp(user) {
 	return response;
 }
 
-//misc bot functions: authenticate user
+//misc plugin functions: authenticate user
 function authenticateOp(user, pass, ignorePass) {
 	var response = "Unknown error happened";
 	if (isOp(user, false) === true && isOp(user) === false) {
@@ -197,7 +154,7 @@ function authenticateOp(user, pass, ignorePass) {
 	return response;
 }
 
-//misc bot functions: de-authenticate user
+//misc plugin functions: de-authenticate user
 function deAuthenticateOp(user) {
 	var response = "Unknown error happened";
 	if (isOp(user) === true) {
@@ -209,7 +166,7 @@ function deAuthenticateOp(user) {
 	return response;
 }
 
-//misc bot functions: short help message
+//misc plugin functions: short help message
 function getHelp() {
 	var helpMessage, commandArray = commandHelp('arrayOfCommands'), commandString = "";
 	for (var command in commandArray) {
@@ -220,7 +177,7 @@ function getHelp() {
 	return helpMessage;
 }
 
-//misc bot functions: is the user op on channel
+//misc plugin functions: is the user op on channel
 function isChanOp(user, channel){
 	var isUserChanOp = false;
 	if (ircChannelUsers[channel] && ircChannelUsers[channel][user] && ircChannelUsers[channel][user].mode) {
@@ -255,16 +212,65 @@ function commandHelp(purpose, command) {
 	return response;
 }
 
-//bot command handle functions: handle bot commands
+//bot command handle functions: handle simple bot commands
 function botSimpleCommandHandle(ircData, ircMessageARGS) {
-	var command = ircMessageARGS[0];
+	var command = ircMessageARGS[0], isCommand = false;
 	if (command.substr(0, pluginSettings.commandPrefix.length) == pluginSettings.commandPrefix) {
 		command = command.substr(pluginSettings.commandPrefix.length);
+		isCommand = true;
+	} else if (pluginSettings.commandPrefixIgnoreOnDirect && ircData[2].charAt(0) != '#') {
+		isCommand = true;
+	}
+	if (isCommand === true) {
 		var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) === null) {target = ircData[1];}
 		if (plugin.botSimpleCommandObject[command] !== undefined) {
-			plugin.botSimpleCommandObject[command]({ircData: ircData, ircMessageARGS: ircMessageARGS, responseTarget: target});
+			try {
+				plugin.botSimpleCommandObject[command]({ircData: ircData, ircMessageARGS: ircMessageARGS, responseTarget: target});
+			} catch (e) {
+				botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+botSimpleCommandOrigin(command)+'" is erroneous: ('+e+')');
+			}
 		}
 	}
+}
+
+//bot command handle functions: add simple bot command (for plugins)
+function botSimpleCommandAdd(command, commandFunction, helpString, origin) {
+	var response = "Unknown error happened";
+	if (plugin.botSimpleCommandObject[command] === undefined) {
+		response = "Success: Command added";
+		plugin.botSimpleCommandObject[command] = commandFunction;
+		if (helpString) {plugin.botCommandHelpArray.arrayValueAdd([command, helpString]);}
+		if (origin) {addedBotSimpleCommandsOrigin[command] = origin;}
+	} else {
+		response = "Error: Command already exists";
+	}
+	return response;
+}
+
+//bot command handle functions: remove simple bot command
+function botSimpleCommandRemove(command) {
+	var response = "Unknown error happened", index;
+	if (plugin.botSimpleCommandObject[command] !== undefined) {
+		response = "Success: Command removed";
+		delete plugin.botSimpleCommandObject[command];
+		for (index in plugin.botCommandHelpArray) {
+			if(plugin.botCommandHelpArray.hasOwnProperty(index)) {
+				if (plugin.botCommandHelpArray[index][0] == command) {
+					plugin.botCommandHelpArray.arrayValueRemove(plugin.botCommandHelpArray[index]);
+				}
+			}
+		}
+		if (addedBotSimpleCommandsOrigin[command] !== undefined) {delete addedBotSimpleCommandsOrigin[command];}
+	} else {
+		response = "Error: Command doesn't exist";
+	}
+	return response;
+}
+
+//bot command handle functions: simple bot command origin
+function botSimpleCommandOrigin(command) {
+	var response = pluginId;
+	if (addedBotSimpleCommandsOrigin[command] !== undefined) {response = addedBotSimpleCommandsOrigin[command];}
 }
 
 //bot command handle functions: handle dynamic bot functions
@@ -276,7 +282,7 @@ function botDynamicFunctionHandle(ircData, ircMessageARGS) {
 			dynamicFunction=eval("(function (data, ircMessageARGS) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
 			dynamicFunction(ircData, ircMessageARGS);
 		} catch (e) {
-			botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous');
+			botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous: ('+e+')');
 		}
 	}
 }
@@ -289,17 +295,19 @@ function botPluggableFunctionHandle(ircData, ircMessageARGS) {
 	}
 }
 
-//handle irc connection creation from bot
+//bot event handle functions
+
+//bot event handle functions: handle irc connection creation from bot
 function pluginHandleIrcConnectionCreation(ircConnection) {
 	if (pluginSettings.handleConnectionErrors) {
 		ircConnection.setTimeout(60*1000);
-		ircConnection.once('error', function (e) {ircConnection.end();ircConnection.destroy();botF.debugMsg("Got error: "+e.message);});
-		ircConnection.once('timeout', function (e) {ircConnection.end();ircConnection.destroy();botF.debugMsg('connection timeout');});
+		ircConnection.once('error', function (e) {ircConnection.end(); ircConnection.destroy(); botF.debugMsg("Got error: "+e.message);});
+		ircConnection.once('timeout', function (e) {ircConnection.end(); ircConnection.destroy(); botF.debugMsg('connection timeout');});
 		ircConnection.once('close', function() {setTimeout(function() {botF.initIrcBot();}, 3000);});
 	}
 }
 
-//handle PRIVMSG from bot
+//bot event handle functions: handle PRIVMSG from bot
 function pluginHandlePRIVMSG(data) {
 	var rawmsg = data[0], from = data[1], to = data[4], message = data[5];
 	var ircMessageARGS = botF.getArgsFromString(message)[0];
@@ -311,7 +319,7 @@ function pluginHandlePRIVMSG(data) {
 	var specificResponse; if ((specificResponse = pluginSettings.specificResponses[message]) !== undefined) {botF.ircSendCommandPRIVMSG(specificResponse, target);}
 }
 
-//handle JOIN from bot
+//bot event handle functions: handle JOIN from bot
 function pluginHandleJOIN(data) {
 	if (data[1] != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
@@ -321,7 +329,7 @@ function pluginHandleJOIN(data) {
 	}
 }
 
-//handle PART from bot
+//bot event handle functions: handle PART from bot
 function pluginHandlePART(data) {
 	if (data[1] != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
@@ -331,7 +339,7 @@ function pluginHandlePART(data) {
 	}
 }
 
-//handle QUIT from bot
+//bot event handle functions: handle QUIT from bot
 function pluginHandleQUIT(data) {
 	if (data[1] != settings.botName){
 		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);}
@@ -345,7 +353,7 @@ function pluginHandleQUIT(data) {
 	}
 }
 
-//handle KICK from bot
+//bot event handle functions: handle KICK from bot
 function pluginHandleKICK(data) {
 	if (data[4] != settings.botName){
 		if(isOp(data[4])){authenticatedOpUsers.arrayValueRemove(data[3]);botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data[3]);}
@@ -358,7 +366,6 @@ pluginFuncObj = {
 	ircSendEntireHelpToUser: ircSendEntireHelpToUser,
 	getRandomLittleFace: getRandomLittleFace,
 	getRandomInt: getRandomInt,
-	printRadioStatus: printRadioStatus,
 	isOp: isOp,
 	giveOp: giveOp,
 	takeOp: takeOp,
@@ -366,8 +373,10 @@ pluginFuncObj = {
 	isChanOp: isChanOp,
 	commandHelp: commandHelp,
 	botSimpleCommandHandle: botSimpleCommandHandle,
-	botDynamicFunctionHandle: botDynamicFunctionHandle,
-	pluginHandlePRIVMSG: pluginHandlePRIVMSG
+	botSimpleCommandAdd: botSimpleCommandAdd,
+	botSimpleCommandRemove: botSimpleCommandRemove,
+	botSimpleCommandOrigin: botSimpleCommandOrigin,
+	botDynamicFunctionHandle: botDynamicFunctionHandle
 };
 for (var name in pluginFuncObj) {module.exports[name] = pluginFuncObj[name];}
 
@@ -384,7 +393,6 @@ module.exports.botCommandHelpArray = [
 	['help', 'help: prints help message'],
 	['away', 'away: prints a list of away users in the channel'],
 	['randomlittleface', 'randomlittleface: get random image from mylittlefacewhen.com'],
-	['np', 'np: shows currently playing song on the radio'],
 	['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
 	['savesettings', 'savesettings: save current settings to file (op only)'],
 	['join', 'join "#channel": make the bot join the channel (op only)'],
@@ -416,7 +424,6 @@ module.exports.botSimpleCommandObject = {
 	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(getHelp(), data.responseTarget);}},
 	away: function (data) {botF.ircSendCommandWHO(data.responseTarget, function (whoData) {var ircGoneUsersRegex = new RegExp('352 (?:[^ \r\n]* )(?:[^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(whoData[0])) !== null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";}botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
 	randomlittleface: function (data) {getRandomLittleFace(data.responseTarget);},
-	np: function (data) {printRadioStatus(data.responseTarget);},
 	raw: function (data) {if(isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.ircMessageARGS[1]+'\r\n');}},
 	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
@@ -460,15 +467,16 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (passedData) {
 	//update variables
 	botObj = passedData.botObj;
+	pluginId = passedData.id;
 	botF = botObj.publicData.botFunctions;
 	settings = botObj.publicData.settings;
-	pluginSettings = settings.pluginsSettings[passedData.id];
+	pluginSettings = settings.pluginsSettings[pluginId];
 	ircChannelUsers = botObj.publicData.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
 		pluginSettings = new settingsConstructor();
-		settings.pluginsSettings[passedData.id] = pluginSettings;
+		settings.pluginsSettings[pluginId] = pluginSettings;
 		botF.botSettingsSave();
 	}
 };

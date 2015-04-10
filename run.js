@@ -10,6 +10,7 @@ var util = require('util');
 var events = require('events');
 var sys = require('sys');
 var exec = require('child_process').exec;
+
 var settings;
 var connections = [];
 var connectionsTmp = [];
@@ -365,7 +366,10 @@ function ircRelayServerInit(){
 		var clientAddr = c.remoteAddress, clientPort = c.remotePort, pingTimeout = null;
 		c.setEncoding('utf8');
 		//c.setTimeout(60*1000);
-		c.on('data', function(chunk) {if (chunk.toUpperCase() == 'PONG\r\n' || chunk.substr(0, 'PONG'.length).toUpperCase() == 'PONG') {clearTimeout(pingTimeout); pingTimeout = null;};});
+		c.on('data', function(chunk) {
+			chunk.replace(/\r\n/g, '\n');
+			if (chunk.toUpperCase() == 'PONG\n') {clearTimeout(pingTimeout); pingTimeout = null;}
+		});
 		c.on('error', function (e) {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" connection error');});
 		c.on('timeout', function (e) {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" connection timed out');});
 		c.on('end', function() {
@@ -375,7 +379,7 @@ function ircRelayServerInit(){
 			debugLog('irc relay client "'+clientAddr+':'+clientPort+'" socket closed');
 		});
 		ircRelayWriteHandle(c);
-		setInterval(function () {if (pingTimeout === null) {c.write('PING\r\n'); pingTimeout = setTimeout(function () {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" ping timed out');}, 30*1000);}}, 10*1000);
+		setInterval(function () {if (pingTimeout === null) {c.write('PING\n'); pingTimeout = setTimeout(function () {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" ping timed out');}, 30*1000);}}, 10*1000);
 		debugLog('client "'+clientAddr+':'+clientPort+'" connected to irc relay');
 	});
 	server.listen(settings.ircRelayServerPort, function() { //'listening' listener
@@ -405,7 +409,7 @@ function handleReceivedPRIVMSGEvent(connection, data) {
 	var connectionName = connections[connection].connectionName||connection;
 	debugLog('['+connectionName+':'+data[4]+'] '+data[1]+': '+data[5]);
 	if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
-		ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\r\n');
+		ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
 	}
 }
 
@@ -657,7 +661,6 @@ function nBot_instance(settings, globalSettings) {
 		},
 		
 		ircResponseHandleQUIT: function (data) {
-			
 			var quitArgs = data.slice(0, 4).concat(new RegExp(':([^\r\n]*)').exec(data[5]).slice(1));
 			botF.emitBotEvent('botReceivedQUIT', quitArgs);
 			if (quitArgs[1] != settings.botName){
