@@ -77,7 +77,7 @@ function getNowPlaying(callback) {
 			var currentSongName = new RegExp('file: (?:[^\/]*\/)*(.*)').exec(currentsongLines[0]);
 			var currentSongPos = currentsongLines.filter(function (element, index, array) {if (element.substr(0, 'Pos: '.length) == 'Pos: ') {return true;}})[0]; if (currentSongPos) {currentSongPos=+currentSongPos.substr('Pos: '.length)+1;}
 			if (currentSongName !== null) {
-				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/');
+				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+'. (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/');
 			}
 		}
 	}
@@ -134,21 +134,25 @@ module.exports.main = function (passedData) {
 			botF.ircSendCommandPRIVMSG(response, data.responseTarget);
 		});
 	}, 'np: shows currently playing song on the radio', pluginId);
+	
 	corePlugin.botSimpleCommandAdd('mpd_play', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 			mpdSendCommand('play '+(+data.ircMessageARGS[1]-1));
 		}
-	}, 'mpd_playid "pos": plays the song at position', pluginId);
+	}, 'mpd_play "pos": plays the song at position', pluginId);
+	
 	corePlugin.botSimpleCommandAdd('mpd_random', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 			mpdSendCommand('random '+data.ircMessageARGS[1]);
 		}
 	}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
+	
 	corePlugin.botSimpleCommandAdd('mpd_prio', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 			mpdSendCommand('prio '+data.ircMessageARGS[1]+' '+(+data.ircMessageARGS[2]-1));
 		}
-	}, 'mpd_prio "priority" "pos": sets priotiry (0 - 255) of song at pos in random mode', pluginId);
+	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pluginId);
+	
 	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 				var pos = +data.ircMessageARGS[1]-1, endpos = +data.ircMessageARGS[2], prio = 255;
@@ -164,6 +168,7 @@ module.exports.main = function (passedData) {
 				}
 		}
 	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
+	
 	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 			mpdSendCommand(data.ircMessageARGS[1]);

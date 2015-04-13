@@ -283,7 +283,7 @@ function pluginHandleIrcConnectionCreation(ircConnection) {
 
 //bot event handle functions: handle PRIVMSG from bot
 function pluginHandlePRIVMSG(data) {
-	var rawmsg = data[0], from = data[1], to = data[4], message = data[5];
+	var rawmsg = data[0], from = data[1].split('!')[0], to = data[4], message = data[5];
 	var ircMessageARGS = botF.getArgsFromString(message)[0];
 	var target = to; if (new RegExp('^#.*$').exec(to) === null) {target = from;}
 	//process commands and such
@@ -295,32 +295,37 @@ function pluginHandlePRIVMSG(data) {
 
 //bot event handle functions: handle JOIN from bot
 function pluginHandleJOIN(data) {
-	if (data[1] != settings.botName){
+	var nick = data[1].split('!')[0];
+	var channel = data[5]||data[3];
+	if (nick != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
-			botF.ircSendCommandPRIVMSG('Welcome '+data[1]+' to channel '+data[4], data[4]);
+			botF.ircSendCommandPRIVMSG('Welcome '+nick+' to channel '+channel, channel);
+			if(nick == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', channel);}
 		}
-		if(data[1] == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data[4]);}
 	}
 }
 
 //bot event handle functions: handle PART from bot
 function pluginHandlePART(data) {
-	if (data[1] != settings.botName){
+	var nick = data[1].split('!')[0];
+	var channel = data[5]||data[3];
+	if (nick != settings.botName){
 		if (pluginSettings.reactToJoinPart === true) {
-			botF.ircSendCommandPRIVMSG('Goodbye '+data[1], data[4]);
+			botF.ircSendCommandPRIVMSG('Goodbye '+nick, channel);
 		}
-		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);botF.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data[1]);}
+		if(isOp(nick)){authenticatedOpUsers.arrayValueRemove(nick);botF.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', nick);}
 	}
 }
 
 //bot event handle functions: handle QUIT from bot
 function pluginHandleQUIT(data) {
-	if (data[1] != settings.botName){
-		if(isOp(data[1])){authenticatedOpUsers.arrayValueRemove(data[1]);}
+	var nick = data[1].split('!')[0];
+	if (nick != settings.botName){
+		if(isOp(nick)){authenticatedOpUsers.arrayValueRemove(nick);}
 		for (var channel in ircChannelUsers) {
-			if (ircChannelUsers[channel][data[1]] !== undefined) {
+			if (ircChannelUsers[channel][nick] !== undefined) {
 				if (pluginSettings.reactToJoinPart === true) {
-					botF.ircSendCommandPRIVMSG('Goodbye '+data[1], channel);
+					botF.ircSendCommandPRIVMSG('Goodbye '+nick, channel);
 				}
 			}
 		}
@@ -329,8 +334,10 @@ function pluginHandleQUIT(data) {
 
 //bot event handle functions: handle KICK from bot
 function pluginHandleKICK(data) {
-	if (data[4] != settings.botName){
-		if(isOp(data[4])){authenticatedOpUsers.arrayValueRemove(data[3]);botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data[3]);}
+	var nick = data[3].split(' ')[1];
+	var channel = data[3].split(' ')[0];
+	if (nick != settings.botName){
+		if(isOp(nick)){authenticatedOpUsers.arrayValueRemove(nick);botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', nick);}
 	}
 }
 
@@ -364,6 +371,7 @@ module.exports.botCommandHelpArray = [
 	['nbot', 'nbot: prints some info about nBot'],
 	['help', 'help: prints help message'],
 	['away', 'away: prints a list of away users in the channel'],
+	['userlist', 'userlist [count|update]: prints a list of users on the channel'],
 	['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
 	['savesettings', 'savesettings: save current settings to file (op only)'],
 	['join', 'join "#channel": make the bot join the channel (op only)'],
@@ -392,7 +400,8 @@ module.exports.botSimpleCommandObject = {
 	ping: function (data) {pingTcpServer(data.ircMessageARGS[1], data.ircMessageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.ircSendCommandPRIVMSG("Port "+data.ircMessageARGS[2]+" on "+data.ircMessageARGS[1]+" is: "+statusString, data.responseTarget);});},
 	nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(getHelp(), data.responseTarget);}},
-	away: function (data) {botF.ircSendCommandWHO(data.responseTarget, function (whoData) {var ircGoneUsersRegex = new RegExp('352 (?:[^ \r\n]* )(?:[^ \r\n]+) (?:[^ \r\n]+ ){3}([^ \r\n]+) G', 'g'), ircGoneUsersString = "", ircGoneUser; while((ircGoneUser = ircGoneUsersRegex.exec(whoData[0])) !== null){ircGoneUsersString=ircGoneUsersString+ircGoneUser[1]+", ";}botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
+	away: function (data) {botF.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
+	userlist: function (data) {if (data.ircMessageARGS[1] == 'update') {botF.ircUpdateUsersInChannel(data.responseTarget);} else if (data.ircMessageARGS[1] == 'count') {botF.ircSendCommandPRIVMSG(Object.keys(botObj.publicData.ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = botObj.publicData.ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += channelUsersObj[user].mode+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; botF.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
 	raw: function (data) {if(isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.ircMessageARGS[1]+'\r\n');}},
 	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
