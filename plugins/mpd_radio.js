@@ -77,7 +77,7 @@ function getNowPlaying(callback) {
 			var currentSongName = new RegExp('file: (?:[^\/]*\/)*(.*)').exec(currentsongLines[0]);
 			var currentSongPos = currentsongLines.filter(function (element, index, array) {if (element.substr(0, 'Pos: '.length) == 'Pos: ') {return true;}})[0]; if (currentSongPos) {currentSongPos=+currentSongPos.substr('Pos: '.length)+1;}
 			if (currentSongName !== null) {
-				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+'. (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/');
+				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/');
 			}
 		}
 	}
@@ -168,6 +168,19 @@ module.exports.main = function (passedData) {
 				}
 		}
 	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
+	
+	corePlugin.botSimpleCommandAdd('mpd_queue_songs', function (data) {
+		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+				var posArray = data.ircMessageARGS[1].split(' ');
+				var commandString = 'random 1\nprio 0 -1', pos, prio = 255;
+				for (pos in posArray) {
+					pos = +posArray[pos]-1;
+					commandString += '\nprio '+prio+' '+pos;
+					prio--;
+				}
+				mpdSendCommand(commandString);
+		}
+	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pluginId);
 	
 	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {

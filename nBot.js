@@ -560,12 +560,14 @@ function nBot_instance(settings, globalSettings) {
 			function pluginHandleBotEvent(id) {
 				nBotObject.botEventsEmitter.once('botEvent', function (data) {
 					if (nBotObject.pluginData[id] && nBotObject.pluginData[id].botEvent) {
+						if (!(data.eventName == 'botPluginDisableEvent' && data.eventData == id)) {
+							pluginHandleBotEvent(id);
+						}
 						try {
 							nBotObject.pluginData[id].botEvent(data);
 						} catch (e) {
 							botF.debugMsg('Error happened when passing botEvent "'+data.eventName+'" to plugin "'+id+'": ('+e+')');
 						}
-						pluginHandleBotEvent(id);
 					}
 				});
 			}
@@ -589,7 +591,7 @@ function nBot_instance(settings, globalSettings) {
 		//misc bot functions: disable a plugin
 		botPluginDisable: function (id) {
 			try {
-				nBotObject.pluginData[id].botEvent({eventName: 'botPluginDisableEvent', eventData: 'disable'});
+				botF.emitBotEvent('botPluginDisableEvent', id);
 				delete nBotObject.pluginData[id];
 			} catch (e) {
 				botF.debugMsg('Error happened when disabling plugin "'+id+'": ('+e+')');

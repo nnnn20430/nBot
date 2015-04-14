@@ -372,6 +372,7 @@ module.exports.botCommandHelpArray = [
 	['help', 'help: prints help message'],
 	['away', 'away: prints a list of away users in the channel'],
 	['userlist', 'userlist [count|update]: prints a list of users on the channel'],
+	['origin', 'origin "command": prints plugin origin of a command'],
 	['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
 	['savesettings', 'savesettings: save current settings to file (op only)'],
 	['join', 'join "#channel": make the bot join the channel (op only)'],
@@ -388,7 +389,8 @@ module.exports.botCommandHelpArray = [
 	['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variables data=["rawmsg","nick","msgtarget","txt"] and ircMessageARGS which is an array with txt interpreted as arguments)'],
 	['functionremove', 'functionremove "name": remove a function named name (op only)'],
 	['functionlist', 'functionlist: prints list of functions (op only)'],
-	['functionshow', 'functionshow "name": prints the code of function named name (op only)']
+	['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
+	['pluginreload', 'pluginreload "id": reload plugin with id (op only)']
 ];
 
 //bot simple commands object
@@ -402,6 +404,7 @@ module.exports.botSimpleCommandObject = {
 	help: function (data) {if(data.ircMessageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(commandHelp("commandInfo", data.ircMessageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(getHelp(), data.responseTarget);}},
 	away: function (data) {botF.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
 	userlist: function (data) {if (data.ircMessageARGS[1] == 'update') {botF.ircUpdateUsersInChannel(data.responseTarget);} else if (data.ircMessageARGS[1] == 'count') {botF.ircSendCommandPRIVMSG(Object.keys(botObj.publicData.ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = botObj.publicData.ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += channelUsersObj[user].mode+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; botF.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
+	origin: function (data) {if (plugin.botSimpleCommandObject[data.ircMessageARGS[1]] !== undefined) {botF.ircSendCommandPRIVMSG('Command "'+data.ircMessageARGS[1]+'" is from plugin "'+botSimpleCommandOrigin(data.ircMessageARGS[1])+'"', data.responseTarget);}},
 	raw: function (data) {if(isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.ircMessageARGS[1]+'\r\n');}},
 	savesettings: function (data) {if(isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
 	join: function (data) {if(isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.ircMessageARGS[1]);}},
@@ -418,7 +421,8 @@ module.exports.botSimpleCommandObject = {
 	functionadd: function (data) {if(isOp(data.ircData[1]) === true) {pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]=data.ircMessageARGS[2];}},
 	functionremove: function (data) {if(isOp(data.ircData[1]) === true) {delete pluginSettings.dynamicFunctions[data.ircMessageARGS[1]];}},
 	functionlist: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
-	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}}
+	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
+	pluginreload: function (data) {if(isOp(data.ircData[1]) === true) {if (botObj.pluginData[data.ircMessageARGS[1]]) {botF.botPluginDisable(data.ircMessageARGS[1]);botF.botPluginLoad(data.ircMessageARGS[1], settings.pluginDir+'/'+data.ircMessageARGS[1]+'.js');}}}
 };
 
 //bot pluggable functions object
