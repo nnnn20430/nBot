@@ -159,7 +159,7 @@ module.exports.main = function (passedData) {
 				if (!data.ircMessageARGS[2]) {
 					mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
 				} else {
-					var commandString = 'random 1\nprio 0 -1';
+					var commandString = 'random 0\nrandom 1';
 					while (pos < endpos && prio > 0) {
 						commandString += '\nprio '+prio+' '+pos;
 						pos++; prio--;
@@ -172,7 +172,7 @@ module.exports.main = function (passedData) {
 	corePlugin.botSimpleCommandAdd('mpd_queue_songs', function (data) {
 		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
 				var posArray = data.ircMessageARGS[1].split(' ');
-				var commandString = 'random 1\nprio 0 -1', pos, prio = 255;
+				var commandString = 'random 0\nrandom 1', pos, prio = 255;
 				for (pos in posArray) {
 					pos = +posArray[pos]-1;
 					commandString += '\nprio '+prio+' '+pos;

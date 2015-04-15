@@ -45,12 +45,16 @@ var settingsConstructor = function (modified) {
 
 //misc plugin functions: ping the server by connecting and quickly closing
 function pingTcpServer(host, port, callback){
-	function returnResults(data) {callback(data);}
+	var isFinished = false;
+	function returnResults(data) {if (!isFinished) {callback(data); isFinished = true;}}
 	var pingHost = net.connect({port: port, host: host}, function () {
 		returnResults(true);
 		pingHost.end();pingHost.destroy();
 	});
+	pingHost.setTimeout(5*1000);
+	pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false);});
 	pingHost.on('error', function () {pingHost.end();pingHost.destroy();returnResults(false);});
+	pingHost.on('close', function () {returnResults(false);});
 }
 
 //misc plugin functions: return entire help
@@ -390,7 +394,8 @@ module.exports.botCommandHelpArray = [
 	['functionremove', 'functionremove "name": remove a function named name (op only)'],
 	['functionlist', 'functionlist: prints list of functions (op only)'],
 	['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
-	['pluginreload', 'pluginreload "id": reload plugin with id (op only)']
+	['pluginreload', 'pluginreload "id": reload plugin with id (op only)'],
+	['pluginreloadall', 'pluginreloadall: reload all plugins (op only)']
 ];
 
 //bot simple commands object
@@ -422,12 +427,13 @@ module.exports.botSimpleCommandObject = {
 	functionremove: function (data) {if(isOp(data.ircData[1]) === true) {delete pluginSettings.dynamicFunctions[data.ircMessageARGS[1]];}},
 	functionlist: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
 	functionshow: function (data) {if(isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.ircMessageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
-	pluginreload: function (data) {if(isOp(data.ircData[1]) === true) {if (botObj.pluginData[data.ircMessageARGS[1]]) {botF.botPluginDisable(data.ircMessageARGS[1]);botF.botPluginLoad(data.ircMessageARGS[1], settings.pluginDir+'/'+data.ircMessageARGS[1]+'.js');}}}
+	pluginreload: function (data) {if(isOp(data.ircData[1]) === true) {if (botObj.pluginData[data.ircMessageARGS[1]]) {botF.botPluginDisable(data.ircMessageARGS[1]);botF.botPluginLoad(data.ircMessageARGS[1], settings.pluginDir+'/'+data.ircMessageARGS[1]+'.js');}}},
+	pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(isOp(data.ircData[1]) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != 'core') {pluginReload(plugin);}}}}
 };
 
 //bot pluggable functions object
 module.exports.botPluggableFunctionObject = {
-	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channelArray=botF.ircWhoisParseChannels(whoisData), channels=""; for (var channel in channelArray[0]){if(channelArray[0].hasOwnProperty(channel)){channels=channels+channelArray[0][channel]+' ';}}botF.ircSendCommandPRIVMSG(whoisData[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
+	whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); botF.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
 	hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
 	ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);}}
 };

@@ -72,14 +72,15 @@ function botSettingsLoad(file, callback) {
 				}
 			});
 		} else if (err.code == "ENOENT"){
-			fs.writeFile(file, JSON.stringify(new settingsConstructor.main({
+			var newSettings = new settingsConstructor.main({
 				connections: [new settingsConstructor.connection({
 					channels: [
 						'#nBot',
 						'#mindcraft'
 					]
 				})]
-			}), null, '\t'), function (err) {if (err) throw err; botSettingsLoad(file, callback);});
+			});
+			fs.writeFile(file, JSON.stringify(newSettings, null, '\t'), function (err) {if (err) throw err; callback(newSettings);});
 		}
 	});
 }
