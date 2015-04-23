@@ -18,9 +18,9 @@ var plugin = module.exports;
 var pluginFuncObj;
 
 //settings constructor
-var settingsConstructor = function (modified) {
+var SettingsConstructor = function (modified) {
 	var settings, attrname;
-	if (this!==settingsConstructor) {
+	if (this!==SettingsConstructor) {
 		settings = {
 			mpdServer: 'localhost',
 			mpdServerPort: 6600,
@@ -122,42 +122,46 @@ module.exports.main = function (passedData) {
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
-		pluginSettings = new settingsConstructor();
+		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[passedData.id] = pluginSettings;
 		botF.botSettingsSave();
 	}
 	
 	//add commands to core plugin
-	var corePlugin = botObj.pluginData.core;
-	corePlugin.botSimpleCommandAdd('np', function (data) {
+	var commandsPlugin = botObj.pluginData.commands.plugin;
+	commandsPlugin.commandAdd('np', function (data) {
 		getNowPlaying(function (response) {
 			botF.ircSendCommandPRIVMSG(response, data.responseTarget);
 		});
 	}, 'np: shows currently playing song on the radio', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_play', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-			mpdSendCommand('play '+(+data.ircMessageARGS[1]-1));
+	commandsPlugin.commandAdd('mpd_play', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('play '+(+data.messageARGS[1]-1));
+			botF.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
 		}
 	}, 'mpd_play "pos": plays the song at position', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_random', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-			mpdSendCommand('random '+data.ircMessageARGS[1]);
+	commandsPlugin.commandAdd('mpd_random', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('random '+data.messageARGS[1]);
+			botF.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
 		}
 	}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_prio', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-			mpdSendCommand('prio '+data.ircMessageARGS[1]+' '+(+data.ircMessageARGS[2]-1));
+	commandsPlugin.commandAdd('mpd_prio', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
+			botF.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
 		}
 	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_queue_song', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-				var pos = +data.ircMessageARGS[1]-1, endpos = +data.ircMessageARGS[2], prio = 255;
-				if (!data.ircMessageARGS[2]) {
+	commandsPlugin.commandAdd('mpd_queue_song', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+				var pos = +data.messageARGS[1]-1, endpos = +data.messageARGS[2], prio = 255;
+				if (!data.messageARGS[2]) {
 					mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
+					botF.ircSendCommandPRIVMSG('mpd: Song queued', data.responseTarget);
 				} else {
 					var commandString = 'random 0\nrandom 1';
 					while (pos < endpos && prio > 0) {
@@ -165,26 +169,29 @@ module.exports.main = function (passedData) {
 						pos++; prio--;
 					}
 					mpdSendCommand(commandString);
+					botF.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 				}
 		}
 	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_queue_songs', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-				var posArray = data.ircMessageARGS[1].split(' ');
-				var commandString = 'random 0\nrandom 1', pos, prio = 255;
+	commandsPlugin.commandAdd('mpd_queue_songs', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+				var posArray = data.messageARGS[1].split(' ');
+				var commandString = 'random 0\nrandom 1\nprio 0 -1', pos, prio = 255;
 				for (pos in posArray) {
 					pos = +posArray[pos]-1;
 					commandString += '\nprio '+prio+' '+pos;
 					prio--;
 				}
+				console.log(commandString);
 				mpdSendCommand(commandString);
+				botF.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 		}
 	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pluginId);
 	
-	corePlugin.botSimpleCommandAdd('mpd_raw', function (data) {
-		if (corePlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
-			mpdSendCommand(data.ircMessageARGS[1]);
+	commandsPlugin.commandAdd('mpd_raw', function (data) {
+		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+			mpdSendCommand(data.messageARGS[1]);
 		}
 	}, 'mpd_raw "command": send command to mpd)', pluginId);
 };

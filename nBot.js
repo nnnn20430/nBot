@@ -23,10 +23,10 @@ process.on('uncaughtException', function (err) {
 });
 
 //settings management
-var settingsConstructor = {
+var SettingsConstructor = {
 	main: function (modified) {
 		var mainSettings, attrname;
-		if (this!==settingsConstructor) {
+		if (this!==SettingsConstructor) {
 			mainSettings = {
 				terminalSupportEnabled: true,
 				ircRelayServerEnabled: true,
@@ -39,7 +39,7 @@ var settingsConstructor = {
 	},
 	connection: function (modified) {
 		var connectionSettings, attrname;
-		if (this!==settingsConstructor) {
+		if (this!==SettingsConstructor) {
 			connectionSettings = {
 				connectionName: 'Connection0',
 				botName: 'nBot',
@@ -52,7 +52,10 @@ var settingsConstructor = {
 				ircMaxCommandResponseWaitQueue: 30,
 				ircMultilineMessageMaxLines: 300,
 				pluginDir: './plugins',
-				plugins: [ 'core' ],
+				plugins: [ 
+					'simpleMsg',
+					'bot'
+				],
 				pluginsSettings: {}
 			};
 			for (attrname in modified) {connectionSettings[attrname]=modified[attrname];}
@@ -72,8 +75,8 @@ function botSettingsLoad(file, callback) {
 				}
 			});
 		} else if (err.code == "ENOENT"){
-			var newSettings = new settingsConstructor.main({
-				connections: [new settingsConstructor.connection({
+			var newSettings = new SettingsConstructor.main({
+				connections: [new SettingsConstructor.connection({
 					channels: [
 						'#nBot',
 						'#mindcraft'
@@ -359,22 +362,22 @@ function isNumeric(n) {
 
 //misc functions: irc relay
 var ircRelayServerEmitter = new events.EventEmitter(); ircRelayServerEmitter.setMaxListeners(0);
-function ircRelayWriteHandle(c) {
+function ircRelayConnectonAddWriteListener(c) {
 	ircRelayServerEmitter.once('write', function (data) {
 		if (c.writable) {
+			ircRelayConnectonAddWriteListener(c);
 			c.write(data);
-			ircRelayWriteHandle(c);
 		} else if (c.writable === false) {c.end(); c.destroy();}
 	});
 }
 
 function ircRelayServerInit(){
 	var server = net.createServer(function(c) { //'connection' listener
-		var clientAddr = c.remoteAddress, clientPort = c.remotePort, pingTimeout = null;
+		var clientAddr = c.remoteAddress, clientPort = c.remotePort, pingInterval, pingTimeout = null;
 		c.setEncoding('utf8');
 		//c.setTimeout(60*1000);
 		c.on('data', function(chunk) {
-			chunk.replace(/\r\n/g, '\n');
+			chunk = chunk.replace(/\r\n/g, '\n');
 			if (chunk.toUpperCase() == 'PONG\n') {clearTimeout(pingTimeout); pingTimeout = null;}
 		});
 		c.on('error', function (e) {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" connection error');});
@@ -383,10 +386,12 @@ function ircRelayServerInit(){
 			c.end();
 		});
 		c.on('close', function() {
+			clearInterval(pingInterval);
+			clearTimeout(pingTimeout);
 			debugLog('irc relay client "'+clientAddr+':'+clientPort+'" socket closed');
 		});
-		ircRelayWriteHandle(c);
-		setInterval(function () {if (pingTimeout === null) {c.write('PING\n'); pingTimeout = setTimeout(function () {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" ping timed out');}, 30*1000);}}, 10*1000);
+		ircRelayConnectonAddWriteListener(c);
+		pingInterval = setInterval(function () {if (pingTimeout === null) {c.write('PING\n'); pingTimeout = setTimeout(function () {c.end(); c.destroy(); debugLog('irc relay client "'+clientAddr+':'+clientPort+'" ping timed out');}, 30*1000);}}, 10*1000);
 		debugLog('client "'+clientAddr+':'+clientPort+'" connected to irc relay');
 	});
 	server.listen(settings.ircRelayServerPort, function() { //'listening' listener
@@ -412,7 +417,7 @@ function killAllnBotInstances(reason, force) {
 }
 
 //misc functions: handle irc message event from bot instance
-function handleReceivedPRIVMSGEvent(connection, data) {
+function botPRIVMSGEvent(connection, data) {
 	var connectionName = connections[connection].connectionName||connection;
 	debugLog('['+connectionName+':'+data[4]+'] '+data[1].split('!')[0]+': '+data[5]);
 	if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
@@ -543,7 +548,12 @@ function nBot_instance(settings, globalSettings) {
 		
 		//misc bot functions: emit debug message event
 		debugMsg: function (data) {
-			nBotObject.botEventsEmitter.emit('botDebugMessage', data);
+			var botEvents = nBotObject.botEventsEmitter;
+			if (botEvents.listeners('botDebugMessage').length) {
+				botEvents.emit('botDebugMessage', data);
+			} else {
+				debugLog(data);
+			}
 		},
 		
 		//misc bot functions: emit botEvent event
@@ -558,11 +568,11 @@ function nBot_instance(settings, globalSettings) {
 		//misc bot functions: load a plugin
 		botPluginLoad: function (id, pluginPath) {
 			pluginPath = path.resolve(pluginPath);
-			function pluginHandleBotEvent(id) {
+			function pluginAddBotEventListener(id) {
 				nBotObject.botEventsEmitter.once('botEvent', function (data) {
 					if (nBotObject.pluginData[id] && nBotObject.pluginData[id].botEvent) {
 						if (!(data.eventName == 'botPluginDisableEvent' && data.eventData == id)) {
-							pluginHandleBotEvent(id);
+							pluginAddBotEventListener(id);
 						}
 						try {
 							nBotObject.pluginData[id].botEvent(data);
@@ -577,7 +587,7 @@ function nBot_instance(settings, globalSettings) {
 					nBotObject.pluginData[id] = require(pluginPath);
 					nBotObject.pluginData[id].main({id: id, botObj: nBotObject});
 					if (nBotObject.pluginData[id].botEvent) {
-						pluginHandleBotEvent(id);
+						pluginAddBotEventListener(id);
 					}
 					//Do not cache plugins
 					if (require.cache && require.cache[pluginPath]) {
@@ -597,6 +607,11 @@ function nBot_instance(settings, globalSettings) {
 			} catch (e) {
 				botF.debugMsg('Error happened when disabling plugin "'+id+'": ('+e+')');
 			}
+		},
+		
+		//write raw data
+		ircWriteData: function (data) {
+			ircConnection.write(data+'\r\n');
 		},
 		
 		//irc command functions
@@ -659,22 +674,13 @@ function nBot_instance(settings, globalSettings) {
 			ircConnection.write('QUIT '+target+' '+mode+'\r\n');
 		},
 		
-		//irc command handle functions
+		//irc response handle functions
 		ircResponseHandlePRIVMSG: function (data) {
 			botF.emitBotEvent('botReceivedPRIVMSG', data);
 		},
 		
-		ircResponseHandleWHOIS: function (data) {
-			botF.emitBotEvent('botReceivedWHOIS', data);
-			ircCommandReEventsEmitter.emit('responseWHOIS', data);
-			var params = data[1][0][3].split(' ');
-			if (params[1] == settings.botName) {ircBotHost=params[3];}
-		},
-		
-		ircResponseHandleWHO: function (data) {
-			botF.emitBotEvent('botReceivedWHO', data);
-			ircCommandReEventsEmitter.emit('responseWHO', data);
-			
+		ircResponseHandleNOTICE: function (data) {
+			botF.emitBotEvent('botReceivedNOTICE', data);
 		},
 		
 		ircResponseHandleJOIN: function (data) {
@@ -707,10 +713,21 @@ function nBot_instance(settings, globalSettings) {
 		
 		ircResponseHandleMODE: function (data) {
 			botF.emitBotEvent('botReceivedMODE', data);
-			var user, mode;
-			if ((user = data[3].split(' ')[3]) !== undefined){
-				var channel = data[3].split(' ')[0];
-				botF.ircSendCommandWHOIS(user, function (_, __, dataArray) {if ((mode = new RegExp('(?::| )([^# \r\n]{0,1})'+channel).exec(dataArray[0])) !== null) {ircChannelUsers[channel][user].mode = mode[1];}});
+			var modeParams = data[3].split(' ');
+			if (modeParams.length == 3) {
+				if(modeParams[0].charAt(0) == '#' && (modeParams[1].charAt(0) == '+' || modeParams[1].charAt(0) == '-')){
+					if (ircChannelUsers[modeParams[0]] && ircChannelUsers[modeParams[0]][modeParams[2]].mode) {
+						if (modeParams[1].charAt(0) == '+') {
+							ircChannelUsers[modeParams[0]][modeParams[2]].mode += modeParams[1].substr(1);
+						}
+						if (modeParams[1].charAt(0) == '-') {
+							var removedModes = modeParams[1].substr(1).split('');
+							for (var mode in removedModes) {
+								ircChannelUsers[modeParams[0]][modeParams[2]].mode = ircChannelUsers[modeParams[0]][modeParams[2]].mode.split(removedModes[mode]).join('');
+							}
+						}
+					}
+				}
 			}
 		},
 		
@@ -735,6 +752,51 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
+		ircResponseHandleTOPIC: function (data) {
+			botF.emitBotEvent('botReceivedTOPIC', data);
+		},
+		
+		ircResponseNumHandle005: function (data) {//RPL_ISUPPORT
+			botF.emitBotEvent('botReceivedNum005', data);
+			var params = data[1][0][3].split(' ');
+			for (var param in params) {
+				var match = params[param].match(/([A-Z]+)=(.*)/);
+				if (match) {
+					switch (match[1]) {
+						case 'CHANMODES':
+							var modeData = match[2].split(',');
+							privateData.ircSupportedChanModes = {'A': modeData[0], 'B': modeData[1], 'C': modeData[2], 'D': modeData[3]};
+						break;
+						case 'PREFIX':
+							var prefixData = match[2].match(/\((.*?)\)(.*)/);
+							var userModeArray = [];
+							for (var userMode in prefixData[1].split('')) {
+								userModeArray.arrayValueAdd([prefixData[1].split('')[userMode], prefixData[2].split('')[userMode]]);
+							}
+							privateData.ircSupportedUserModesArray = userModeArray;
+						break;
+					}
+				}
+			}
+		},
+		
+		ircResponseNumHandle311: function (data) {//RPL_WHOISUSER
+			botF.emitBotEvent('botReceivedNum311', data);
+			ircCommandReEventsEmitter.emit('responseWHOIS', data);
+			var params = data[1][0][3].split(' ');
+			if (params[1] == settings.botName) {ircBotHost=params[3];}
+		},
+		
+		ircResponseNumHandle352: function (data) {//RPL_WHOREPLY
+			botF.emitBotEvent('botReceivedNum352', data);
+			ircCommandReEventsEmitter.emit('responseWHO', data);
+			
+		},
+		
+		ircResponseNumHandle353: function (data) {//RPL_NAMREPLY
+			botF.emitBotEvent('botReceivedNum353', data);
+		},
+		
 		//main irc data receiving function
 		ircDataReceiveHandle: function (data) {
 			botF.emitBotEvent('botReceivedDataRAW', data);
@@ -743,12 +805,14 @@ function nBot_instance(settings, globalSettings) {
 			function ircCommandHandle(data) {
 				privateData.ircCommandMessageHandles = {
 					'PRIVMSG': botF.ircResponseHandlePRIVMSG,
+					'NOTICE': botF.ircResponseHandleNOTICE,
 					'JOIN': botF.ircResponseHandleJOIN,
 					'PART': botF.ircResponseHandlePART,
 					'QUIT': botF.ircResponseHandleQUIT,
 					'MODE': botF.ircResponseHandleMODE,
 					'NICK': botF.ircResponseHandleNICK,
-					'KICK': botF.ircResponseHandleKICK
+					'KICK': botF.ircResponseHandleKICK,
+					'TOPIC': botF.ircResponseHandleTOPIC,
 				};
 				
 				if (privateData.ircCommandMessageHandles[data[2]] !== undefined) {
@@ -758,8 +822,10 @@ function nBot_instance(settings, globalSettings) {
 			
 			function ircNumericHandle(data) {
 				privateData.ircNumericMessageHandles = {
-					'311': {endNumeric: '318', messageHandle: botF.ircResponseHandleWHOIS},
-					'352': {endNumeric: '315', messageHandle: botF.ircResponseHandleWHO}
+					'005': {endNumeric: '005', messageHandle: botF.ircResponseNumHandle005},
+					'311': {endNumeric: '318', messageHandle: botF.ircResponseNumHandle311},
+					'352': {endNumeric: '315', messageHandle: botF.ircResponseNumHandle352},
+					'353': {endNumeric: '366', messageHandle: botF.ircResponseNumHandle353}
 				};
 				
 				if (privateData.ircUnfinishedMultilineMessage !== undefined) {
@@ -795,6 +861,7 @@ function nBot_instance(settings, globalSettings) {
 						delete privateData.ircUnfinishedMessage;
 					}
 					messageData = botF.ircParseMessageLine(line);
+					botF.emitBotEvent('botReceivedDataParsedLine', data);
 					if (!isNumeric(messageData[2])) {
 						ircCommandHandle(messageData);
 					} else {
@@ -828,6 +895,7 @@ function nBot_instance(settings, globalSettings) {
 					if (new RegExp(':[^ \r\n]* 001 '+settings.botName, 'g').exec(chunk) !== null) {
 						ircConnectionRegistrationCompleted = true;
 						botF.ircPostConnectionRegistrationHandle();
+						botF.emitBotEvent('botIrcConnectionRegistered', ircConnection);
 					}
 				}
 			}
@@ -877,7 +945,7 @@ botSettingsLoad(null, function (data) {
 	if(settings.ircRelayServerEnabled){ircRelayServerInit();}
 	function handleBotEvent(connection, event) {
 		switch (event.eventName) {
-			case 'botReceivedPRIVMSG': handleReceivedPRIVMSGEvent(connection, event.eventData); break;
+			case 'botReceivedPRIVMSG': botPRIVMSGEvent(connection, event.eventData); break;
 		}
 	}
 	for (var connection in connections) {
