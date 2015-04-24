@@ -269,8 +269,8 @@ var pluginObj = {
 	//bot command handle functions: pluggable functions (to make it easier for plugins to add or remove functions)
 	pluggableFunctionHandle: function (ircData, messageARGS) {
 		var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) === null) {target = ircData[1];}
-		for (var pluggableFunction in pluginObj.botPluggableFunctionObject) {
-			pluginObj.botPluggableFunctionObject[pluggableFunction]({ircData: ircData, messageARGS: messageARGS, responseTarget: target});
+		for (var pluggableFunction in pluginObj.pluggableFunctionObject) {
+			pluginObj.pluggableFunctionObject[pluggableFunction]({ircData: ircData, messageARGS: messageARGS, responseTarget: target});
 		}
 	},
 	

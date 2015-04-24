@@ -163,7 +163,7 @@ module.exports.main = function (passedData) {
 					mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
 					botF.ircSendCommandPRIVMSG('mpd: Song queued', data.responseTarget);
 				} else {
-					var commandString = 'random 0\nrandom 1';
+					var commandString = 'random 0\nrandom 1\nprio 0 -1';
 					while (pos < endpos && prio > 0) {
 						commandString += '\nprio '+prio+' '+pos;
 						pos++; prio--;
