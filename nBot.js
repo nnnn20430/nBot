@@ -54,7 +54,7 @@ var SettingsConstructor = {
 				pluginDir: './plugins',
 				plugins: [ 
 					'simpleMsg',
-					'bot'
+					'commands'
 				],
 				pluginsSettings: {}
 			};

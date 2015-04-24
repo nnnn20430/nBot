@@ -433,6 +433,15 @@ module.exports.main = function (passedData) {
 		}
 	});
 	
+	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+		if (data.nick != settings.botName){
+			if(pluginObj.isOp(data.nick)){
+				pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
+				botF.ircSendCommandPRIVMSG('You have chnaged your authenticated operator nickname you have been de-authenticated', data.newnick);
+			}
+		}
+	});
+	
 	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
 		if (data.nick != settings.botName){
 			if(pluginObj.isOp(data.nick)){
