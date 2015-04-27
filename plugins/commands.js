@@ -437,7 +437,7 @@ module.exports.main = function (passedData) {
 		if (data.nick != settings.botName){
 			if(pluginObj.isOp(data.nick)){
 				pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
-				botF.ircSendCommandPRIVMSG('You have chnaged your authenticated operator nickname you have been de-authenticated', data.newnick);
+				botF.ircSendCommandPRIVMSG('You have changed your authenticated operator nickname you have been de-authenticated', data.newnick);
 			}
 		}
 	});

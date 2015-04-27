@@ -225,24 +225,104 @@ var pluginObj = {
 		}
 	},
 	
+	msgParseKILL: function (data, callback) {
+		var nick = data[1].split('!')[0];
+		var reason = data[5]||data[3];
+		var channels = [];
+		for (var channel in ircChannelUsers) {
+			if (ircChannelUsers[channel][nick] !== undefined) {
+				channels.arrayValueAdd(channel);
+			}
+		}
+		var parsedData = {rawdata: data, nick: nick, reason: reason, channels: channels};
+		if (!callback) {
+			pluginObj.msgEmit('QUIT', parsedData);
+		} else {
+			callback(parsedData);
+		}
+	},
+	
 	msgParseNum005: function (data, callback) {
-		//fix me
+		//fix me (eh later im lazy)
 	},
 	
 	msgParseNum311: function (data, callback) {
-		//fix me
+		var line;
+		var params = data[1][0][3].split(' ');
+		var parsedData = {
+			rawdata: data,
+			nick: params[1],
+			user: params[2],
+			host: params[3],
+			realname: data[1][0][5],
+			channels: [],
+			away: false,
+			idle: '',
+			signontime: '',
+			server: '',
+			serverinfo: '',
+			operator: false
+		};
+		for (line in data[1]) {
+			if (data[1][line][2] == 319) {
+				parsedData.channels = parsedData.channels.concat(data[1][line][5].split(' '));
+				if (parsedData.channels[parsedData.channels.length-1] === '') {
+					parsedData.channels.splice(parsedData.channels.length-1, 1);
+				}
+			}
+			if (data[1][line][2] == 301) {
+				parsedData.away = data[1][line][5];
+			}
+			if (data[1][line][2] == 317) {
+				parsedData.idle = data[1][line][4].split(' ')[2];
+				parsedData.signontime = data[1][line][4].split(' ')[3];
+			}
+			if (data[1][line][2] == 312) {
+				parsedData.server = data[1][line][3].split(' ')[2];
+				parsedData.serverinfo = data[1][line][5];
+			}
+			if (data[1][line][2] == 313) {
+				parsedData.operator = data[1][line][5];
+			}
+		}
+		if (!callback) {
+			pluginObj.msgEmit('RPL_WHOISUSER', parsedData);
+		} else {
+			callback(parsedData);
+		}
 	},
 	
 	msgParseNum352: function (data, callback) {
-		//fix me
+		var line;
+		var parsedData = {};
+		var params;
+		for (line in data[1]) {
+			if (data[1][line][2] == 352) {
+				params = data[1][line][3].split(' ');
+				if (!parsedData[params[1]]) {parsedData[params[1]] = {};}
+				parsedData[params[1]][params[2]] = {
+					host: params[3],
+					server: params[4],
+					nick: params[5],
+					isHere: params[6].charAt(0) == 'H' ? true : false,
+					isGlobalOP: params[6].charAt(1) == '*' ? true : false,
+					mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1)
+				};
+			}
+		}
+		if (!callback) {
+			pluginObj.msgEmit('RPL_WHOREPLY', parsedData);
+		} else {
+			callback(parsedData);
+		}
 	},
 	
 	msgParseNum353: function (data, callback) {
 		var channel = data[1][0][4];
 		var nicks = {};
 		var supportedPrefixes = "@+";
-		for (var prefix in botObj.publicData.botPrivateData.ircSupportedUserModesArray) {
-			supportedPrefixes += botObj.publicData.botPrivateData.ircSupportedUserModesArray[prefix][1];
+		for (var prefix in botObj.publicData.botVariables.ircSupportedUserModesArray) {
+			supportedPrefixes += botObj.publicData.botVariables.ircSupportedUserModesArray[prefix][1];
 		}
 		for (var line in data[1]) {
 			var nickArray = data[1][line][5].split(' ');
