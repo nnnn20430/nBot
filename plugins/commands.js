@@ -1,4 +1,5 @@
 /*jshint node: true*/
+/*jshint evil: true*/
 
 "use strict";
 //variables
@@ -37,6 +38,7 @@ var SettingsConstructor = function (modified) {
 	}
 };
 
+//main plugin object
 var pluginObj = {
 	//variables
 	authenticatedOpUsers: [],
@@ -48,14 +50,16 @@ var pluginObj = {
 	pingTcpServer: function (host, port, callback){
 		var isFinished = false;
 		function returnResults(data) {if (!isFinished) {callback(data); isFinished = true;}}
-		var pingHost = net.connect({port: port, host: host}, function () {
-			returnResults(true);
-			pingHost.end();pingHost.destroy();
-		});
-		pingHost.setTimeout(5*1000);
-		pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false);});
-		pingHost.on('error', function () {pingHost.end();pingHost.destroy();returnResults(false);});
-		pingHost.on('close', function () {returnResults(false);});
+		if (port > 0 && port < 65536) {
+			var pingHost = net.connect({port: port, host: host}, function () {
+				returnResults(true);
+				pingHost.end();pingHost.destroy();
+			});
+			pingHost.setTimeout(5*1000);
+			pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false);});
+			pingHost.on('error', function () {pingHost.end();pingHost.destroy();returnResults(false);});
+			pingHost.on('close', function () {returnResults(false);});
+		} else {returnResults(false);}
 	},
 	
 	//misc plugin functions: return entire help
@@ -254,7 +258,6 @@ var pluginObj = {
 	
 	//bot command handle functions: handle dynamic bot functions
 	dynamicFunctionHandle: function (ircData, messageARGS) {
-		/*jshint -W061 */
 		var dynamicFunction;
 		for (var dynamicFunctionName in pluginSettings.dynamicFunctions) {
 			try {
@@ -317,7 +320,10 @@ var pluginObj = {
 		['functionlist', 'functionlist: prints list of functions (op only)'],
 		['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
 		['pluginreload', 'pluginreload "id": reload plugin with id (op only)'],
-		['pluginreloadall', 'pluginreloadall: reload all plugins (op only)']
+		['pluginreloadall', 'pluginreloadall: reload all plugins (op only)'],
+		['evaljs', 'evaljs "code": evaluates node.js code (op only)'],
+		['pluginload', 'pluginload "plugin": load a plugin (op only)'],
+		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)']
 	],
 	
 	//bot commands object
@@ -350,7 +356,10 @@ var pluginObj = {
 		functionlist: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
 		functionshow: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.messageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
 		pluginreload: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {if (botObj.pluginData[data.messageARGS[1]]) {botF.botPluginDisable(data.messageARGS[1]);botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');}}},
-		pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(pluginObj.isOp(data.ircData[1]) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != pluginId && plugin != 'simpleMsg') {pluginReload(plugin);}}}}
+		pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(pluginObj.isOp(data.ircData[1]) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != pluginId && plugin != 'simpleMsg') {pluginReload(plugin);}}}},
+		evaljs: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
+		pluginload: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
+		plugindisable: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}}
 	},
 	
 	//bot pluggable functions object

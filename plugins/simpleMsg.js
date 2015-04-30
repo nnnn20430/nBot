@@ -1,4 +1,5 @@
 /*jshint node: true*/
+/*jshint evil: true*/
 
 "use strict";
 //variables
@@ -30,6 +31,7 @@ var SettingsConstructor = function (modified) {
 	}
 };
 
+//main plugin object
 var pluginObj = {
 	//variables
 	msgListenerObj: {},

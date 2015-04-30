@@ -350,7 +350,61 @@ function decode_utf8(s) {
 
 //misc functions: get shell like arguments from a string
 function getArgsFromString(str) {
-	var strARGS = {}, strARGC = 0, strARG, strARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+(?=(?:"|\\\\"|\\\\)))(?:(?:(?:\\\\)*(?!"))?(?:\\\\")?)*)+)(?:"))+|([^ ]+)+)+(?: )?', 'g');
+	var strArray = str.split('');
+	var strARGS = []
+	var strARGC = 0
+	var strARG = '';
+	var strChar = '';
+	var isString = false;
+	var escape = false;
+	var escaped = false;
+	
+	for (strChar in strArray) {
+		strChar = strArray[strChar];
+		if (escaped) {escaped = false;}
+		if (escape) {escape = false; escaped = true;}
+		switch (strChar) {
+			case '\\':
+				if (!escaped) {
+					escape = true;
+				} else {
+					strARG += strChar;	
+				}
+				break;
+			case '"':
+				if (!escaped) { 
+					if (!isString) {
+						isString = true;
+					} else {
+						isString = false;
+						strARGS[strARGC] = strARG;
+						strARGC++;
+						strARG = '';
+					}
+				} else {
+					strARG += strChar;
+				}
+				break;
+			case ' ':
+				if (!isString && strARG) {
+					strARGS[strARGC] = strARG;
+					strARGC++;
+					strARG = '';
+				} else if (isString) {
+					strARG += strChar;
+				}
+				break;
+			default:
+				strARG += strChar;
+		}
+	}
+	if (strARG) {strARGS[strARGC] = strARG; strARGC++;}
+	return [strARGS, strARGC];
+}
+
+//misc functions: get shell like arguments from a string using regex
+function getArgsFromStringRegex(str) {
+	var strARGS = [], strARGC = 0, strARG, strARGRegex = new RegExp('(?:(?:(?:")+((?:(?:[^\\\\"]+(?=(?:"|\\\\"|\\\\)))(?:(?:(?:\\\\)*(?!"))?(?:\\\\")?)*)+)(?:"))+|([^ ]+)+)+(?: )?', 'g');
 	while ((strARG = strARGRegex.exec(str)) !== null) {if(strARG[1] !== undefined){strARGS[strARGC]=strARG[1].replace(new RegExp('\\\\"', 'g'), '"');}else{strARGS[strARGC]=strARG[2];}strARGC++;}
 	return [strARGS, strARGC];
 }

@@ -1,4 +1,5 @@
 /*jshint node: true*/
+/*jshint evil: true*/
 
 "use strict";
 //variables
