@@ -351,24 +351,29 @@ function decode_utf8(s) {
 //misc functions: get shell like arguments from a string
 function getArgsFromString(str) {
 	var strArray = str.split('');
-	var strARGS = []
-	var strARGC = 0
-	var strARG = '';
+	var strARGS = [];
+	var strARGC = 0;
 	var strChar = '';
 	var isString = false;
 	var escape = false;
 	var escaped = false;
 	
+	function addToArgs(str) {
+		if (!strARGS[strARGC]) {
+			strARGS[strARGC] = '';
+		}
+		strARGS[strARGC] += str;
+	}
+	
 	for (strChar in strArray) {
-		strChar = strArray[strChar];
 		if (escaped) {escaped = false;}
 		if (escape) {escape = false; escaped = true;}
-		switch (strChar) {
+		switch (strArray[strChar]) {
 			case '\\':
 				if (!escaped) {
 					escape = true;
 				} else {
-					strARG += strChar;	
+					addToArgs('\\');	
 				}
 				break;
 			case '"':
@@ -377,28 +382,24 @@ function getArgsFromString(str) {
 						isString = true;
 					} else {
 						isString = false;
-						strARGS[strARGC] = strARG;
-						strARGC++;
-						strARG = '';
 					}
 				} else {
-					strARG += strChar;
+					addToArgs('"');
 				}
 				break;
 			case ' ':
-				if (!isString && strARG) {
-					strARGS[strARGC] = strARG;
+				if (!isString) {
 					strARGC++;
-					strARG = '';
 				} else if (isString) {
-					strARG += strChar;
+					if (escaped) {addToArgs('\\');}
+					addToArgs(' ');
 				}
 				break;
 			default:
-				strARG += strChar;
+				if (escaped) {addToArgs('\\');}
+				addToArgs(strArray[strChar]);
 		}
 	}
-	if (strARG) {strARGS[strARGC] = strARG; strARGC++;}
 	return [strARGS, strARGC];
 }
 
