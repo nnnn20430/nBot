@@ -510,11 +510,19 @@ function nBot_instance(settings, globalSettings) {
 	//clean old command events
 	ircCommandReEventsEmitter.on('newListener', function (data) {
 		var listeners = ircCommandReEventsEmitter.listeners(data);
-		while (listeners.length > settings.ircMaxCommandResponseWaitQueue) {ircCommandReEventsEmitter.removeListener(data, listeners[0]);listeners = ircCommandReEventsEmitter.listeners(data);}
+		while (listeners.length > settings.ircMaxCommandResponseWaitQueue) {
+			ircCommandReEventsEmitter.removeListener(data, listeners[0]);
+			listeners = ircCommandReEventsEmitter.listeners(data);
+		}
 	});
 	
 	//bot variable bject
-	var botV = {};
+	var botV = {
+		ircSupportedUserModesArray: [
+			['o', '@'],
+			['v', '+']
+		]
+	};
 	
 	//bot functions object
 	var botF = {
@@ -585,7 +593,7 @@ function nBot_instance(settings, globalSettings) {
 						if ((ircChannelUsers[whoData[1]] && ircChannelUsers[whoData[1]][whoData[5]]) !== undefined) {whoDataObject[whoData[5]] = ircChannelUsers[whoData[1]][whoData[5]];}
 						if (whoData[6].charAt(0) == "H") {whoDataObject[whoData[5]].isHere = true;}else{whoDataObject[whoData[5]].isHere = false;}
 						if (whoData[6].charAt(1) == "*") {whoDataObject[whoData[5]].isGlobalOP = true;}else{whoDataObject[whoData[5]].isGlobalOP = false;}
-						if (whoData[6].charAt(2)||whoData[6].charAt(1).replace('*','')) {whoDataObject[whoData[5]].mode = whoData[6].charAt(2)||whoData[6].charAt(1).replace('*','');}else{whoDataObject[whoData[5]].mode = "";}
+						if (whoData[6].charAt(2)||whoData[6].charAt(1).replace('*','')) {whoDataObject[whoData[5]].mode = botF.ircModePrefixConvert('mode', whoData[6].charAt(2)||whoData[6].charAt(1).replace('*',''));}else{whoDataObject[whoData[5]].mode = "";}
 					}
 				}
 				ircChannelUsers[channel] = whoDataObject;
@@ -666,6 +674,33 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
+		ircModePrefixConvert : function (convertTo, str) {
+			var strArray = str.split('');
+			var strChar;
+			var mode;
+			switch (convertTo) {
+				case 'prefix':
+					for (mode in botV.ircSupportedUserModesArray) {
+						for (strChar in strArray) {
+							if (strArray[strChar] == botV.ircSupportedUserModesArray[mode][0]) {
+								strArray[strChar] = botV.ircSupportedUserModesArray[mode][1];
+							}
+						}
+					}
+					break;
+				case 'mode':
+					for (mode in botV.ircSupportedUserModesArray) {
+						for (strChar in strArray) {
+							if (strArray[strChar] == botV.ircSupportedUserModesArray[mode][1]) {
+								strArray[strChar] = botV.ircSupportedUserModesArray[mode][0];
+							}
+						}
+					}
+					break;
+			}
+			return strArray.join('');
+		},
+		
 		//write raw data
 		ircWriteData: function (data) {
 			ircConnection.write(data+'\r\n');
@@ -678,6 +713,22 @@ function nBot_instance(settings, globalSettings) {
 			timeout=timeout||1000;
 			function writeData(data, to, c, timeout) {
 				setTimeout(function() {ircConnection.write('PRIVMSG '+to+' :'+data[c]+'\r\n'); c++; if (data[c] !== undefined) {writeData(data, to, c, timeout);}}, timeout);
+			}
+			while ((string = dataLengthRegExp.exec(data)) !== null) {
+				stringArray[c]=string[0];c++;
+			}
+			if (!forceTimeout) {
+				if (c <= 1) {timeout=0;}
+			}
+			writeData(stringArray, to, 0, timeout);
+		},
+		
+		ircSendCommandNOTICE: function (data, to, timeout, forceTimeout){
+			var privmsgLenght = 512-(":"+settings.botName+"!"+settings.botName+"@"+ircBotHost+" NOTICE "+to+" :\r\n").length;
+			var dataLengthRegExp = new RegExp('.{1,'+privmsgLenght+'}', 'g'), stringArray = [], c = 0, string;
+			timeout=timeout||1000;
+			function writeData(data, to, c, timeout) {
+				setTimeout(function() {ircConnection.write('NOTICE '+to+' :'+data[c]+'\r\n'); c++; if (data[c] !== undefined) {writeData(data, to, c, timeout);}}, timeout);
 			}
 			while ((string = dataLengthRegExp.exec(data)) !== null) {
 				stringArray[c]=string[0];c++;
@@ -732,15 +783,15 @@ function nBot_instance(settings, globalSettings) {
 		},
 		
 		//irc response handle functions
-		ircResponseHandlePRIVMSG: function (data) {
+		ircReceiveHandlePRIVMSG: function (data) {
 			botF.emitBotEvent('botReceivedPRIVMSG', data);
 		},
 		
-		ircResponseHandleNOTICE: function (data) {
+		ircReceiveHandleNOTICE: function (data) {
 			botF.emitBotEvent('botReceivedNOTICE', data);
 		},
 		
-		ircResponseHandleJOIN: function (data) {
+		ircReceiveHandleJOIN: function (data) {
 			botF.emitBotEvent('botReceivedJOIN', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
@@ -748,7 +799,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandlePART: function (data) {
+		ircReceiveHandlePART: function (data) {
 			botF.emitBotEvent('botReceivedPART', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
@@ -756,7 +807,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandleQUIT: function (data) {
+		ircReceiveHandleQUIT: function (data) {
 			botF.emitBotEvent('botReceivedQUIT', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
@@ -768,7 +819,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandleMODE: function (data) {
+		ircReceiveHandleMODE: function (data) {
 			botF.emitBotEvent('botReceivedMODE', data);
 			var modeParams = data[3].split(' ');
 			if (modeParams.length == 3) {
@@ -788,7 +839,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandleNICK: function (data) {
+		ircReceiveHandleNICK: function (data) {
 			botF.emitBotEvent('botReceivedNICK', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
@@ -801,7 +852,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandleKICK: function (data) {
+		ircReceiveHandleKICK: function (data) {
 			botF.emitBotEvent('botReceivedKICK', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
@@ -809,15 +860,15 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseHandleTOPIC: function (data) {
+		ircReceiveHandleTOPIC: function (data) {
 			botF.emitBotEvent('botReceivedTOPIC', data);
 		},
 		
-		ircResponseHandleKILL: function (data) {
+		ircReceiveHandleKILL: function (data) {
 			botF.emitBotEvent('botReceivedKILL', data);
 		},
 		
-		ircResponseNumHandle005: function (data) {//RPL_ISUPPORT
+		ircReceiveNumHandle005: function (data) {//RPL_ISUPPORT
 			botF.emitBotEvent('botReceivedNum005', data);
 			var params = data[1][0][3].split(' ');
 			for (var param in params) {
@@ -841,20 +892,20 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
-		ircResponseNumHandle311: function (data) {//RPL_WHOISUSER
+		ircReceiveNumHandle311: function (data) {//RPL_WHOISUSER
 			botF.emitBotEvent('botReceivedNum311', data);
 			ircCommandReEventsEmitter.emit('responseWHOIS', data);
 			var params = data[1][0][3].split(' ');
 			if (params[1] == settings.botName) {ircBotHost=params[3];}
 		},
 		
-		ircResponseNumHandle352: function (data) {//RPL_WHOREPLY
+		ircReceiveNumHandle352: function (data) {//RPL_WHOREPLY
 			botF.emitBotEvent('botReceivedNum352', data);
 			ircCommandReEventsEmitter.emit('responseWHO', data);
 			
 		},
 		
-		ircResponseNumHandle353: function (data) {//RPL_NAMREPLY
+		ircReceiveNumHandle353: function (data) {//RPL_NAMREPLY
 			botF.emitBotEvent('botReceivedNum353', data);
 		},
 		
@@ -864,30 +915,17 @@ function nBot_instance(settings, globalSettings) {
 			var ircMessageLines = data.split('\r\n');
 			
 			function ircCommandHandle(data) {
-				botV.ircCommandMessageHandles = {
-					'PRIVMSG': botF.ircResponseHandlePRIVMSG,
-					'NOTICE': botF.ircResponseHandleNOTICE,
-					'JOIN': botF.ircResponseHandleJOIN,
-					'PART': botF.ircResponseHandlePART,
-					'QUIT': botF.ircResponseHandleQUIT,
-					'MODE': botF.ircResponseHandleMODE,
-					'NICK': botF.ircResponseHandleNICK,
-					'KICK': botF.ircResponseHandleKICK,
-					'TOPIC': botF.ircResponseHandleTOPIC,
-					'KILL': botF.ircResponseHandleKILL
-				};
-				
-				if (botV.ircCommandMessageHandles[data[2]] !== undefined) {
-					botV.ircCommandMessageHandles[data[2]](data);
+				if (botF['ircReceiveHandle'+data[2]] !== undefined) {
+					botF['ircReceiveHandle'+data[2]](data);
 				}
 			}
 			
 			function ircNumericHandle(data) {
 				botV.ircNumericMessageHandles = {
-					'005': {endNumeric: '005', messageHandle: botF.ircResponseNumHandle005},
-					'311': {endNumeric: '318', messageHandle: botF.ircResponseNumHandle311},
-					'352': {endNumeric: '315', messageHandle: botF.ircResponseNumHandle352},
-					'353': {endNumeric: '366', messageHandle: botF.ircResponseNumHandle353}
+					'005': {endNumeric: '005', messageHandle: botF.ircReceiveNumHandle005},
+					'311': {endNumeric: '318', messageHandle: botF.ircReceiveNumHandle311},
+					'352': {endNumeric: '315', messageHandle: botF.ircReceiveNumHandle352},
+					'353': {endNumeric: '366', messageHandle: botF.ircReceiveNumHandle353}
 				};
 				
 				if (botV.ircUnfinishedMultilineMessage !== undefined) {

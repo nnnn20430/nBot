@@ -102,6 +102,7 @@ var pluginObj = {
 		}
 	},
 	
+	//message handling functions: handle NOTICE
 	msgParseNOTICE: function (data, callback) {
 		var nick = data[1].split('!')[0], to = data[4], message = data[5];
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message};
