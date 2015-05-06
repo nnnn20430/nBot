@@ -30,6 +30,7 @@ var SettingsConstructor = function (modified) {
 			commandPrefixIgnoreOnDirect: true,
 			handleConnectionErrors: true,
 			reactToJoinPart: true,
+			disabledPluginRemoveCommands: true,
 			specificResponses: {},
 			dynamicFunctions: {}
 		};
@@ -256,6 +257,16 @@ var pluginObj = {
 		return response;
 	},
 	
+	//bot command handle functions: remove commands with same origin
+	commandsRemoveByOrigin: function (origin) {
+		var command;
+		for (command in pluginObj.commandsOriginObj) {
+			if (pluginObj.commandsOriginObj[command] == origin) {
+				pluginObj.commandRemove(command);
+			}
+		}
+	},
+	
 	//bot command handle functions: handle dynamic bot functions
 	dynamicFunctionHandle: function (ircData, messageARGS) {
 		var dynamicFunction;
@@ -379,6 +390,7 @@ module.exports.plugin = pluginObj;
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botIrcConnectionCreated': pluginObj.pluginHandleIrcConnectionCreation(event.eventData); break;
+		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveCommands) {pluginObj.commandsRemoveByOrigin(event.eventData);} break;
 	}
 };
 
