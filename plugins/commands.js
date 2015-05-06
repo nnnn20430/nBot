@@ -196,7 +196,7 @@ var pluginObj = {
 	
 	//bot command handle functions: handle simple bot commands
 	commandHandle: function (ircData, messageARGS) {
-		var command = messageARGS[0], isCommand = false;
+		var command = messageARGS[0]||'', isCommand = false;
 		if (command.substr(0, pluginSettings.commandPrefix.length) == pluginSettings.commandPrefix) {
 			command = command.substr(pluginSettings.commandPrefix.length);
 			isCommand = true;
