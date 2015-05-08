@@ -164,7 +164,7 @@ var pluginObj = {
 	isChanOp: function (user, channel){
 		var isUserChanOp = false;
 		if (ircChannelUsers[channel] && ircChannelUsers[channel][user] && ircChannelUsers[channel][user].mode) {
-			if (ircChannelUsers[channel][user].mode.replace(/^(@|~|%|&)$/, "isOp").indexOf("isOp") != -1 ) {isUserChanOp = true;}
+			if (ircChannelUsers[channel][user].mode.replace(/^(o|q|h|a)$/, "isOp").indexOf("isOp") != -1 ) {isUserChanOp = true;}
 			if (ircChannelUsers[channel][user].isGlobalOP) {isUserChanOp = true;}
 		}
 		return isUserChanOp;

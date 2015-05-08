@@ -11,6 +11,7 @@ var events = require('events');
 var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
+var vm = require('vm');
 
 var settings;
 var connections = [];
@@ -674,6 +675,7 @@ function nBot_instance(settings, globalSettings) {
 			}
 		},
 		
+		//misc bot functions: convert between modes and prefixes
 		ircModePrefixConvert : function (convertTo, str) {
 			var strArray = str.split('');
 			var strChar;
