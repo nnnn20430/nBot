@@ -26,6 +26,7 @@ var SettingsConstructor = function (modified) {
 			radioStatus_mpdServerPort: 6600,
 			opUsers: { 'nnnn20430': '' },
 			opUsers_commandsAllowChanOp: false,
+			opUsers_disabled: false,
 			commandPrefix: '.',
 			commandPrefixIgnoreOnDirect: true,
 			handleConnectionErrors: true,
@@ -90,6 +91,7 @@ var pluginObj = {
 				isOpUser = true;
 			}
 		}
+		if (pluginSettings.opUsers_disabled) {isOpUser = true;}
 		return isOpUser;
 	},
 	
@@ -334,7 +336,8 @@ var pluginObj = {
 		['pluginreloadall', 'pluginreloadall: reload all plugins (op only)'],
 		['evaljs', 'evaljs "code": evaluates node.js code (op only)'],
 		['pluginload', 'pluginload "plugin": load a plugin (op only)'],
-		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)']
+		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
+		['date', 'date ["UTC"|"UNIX"]: get current date']
 	],
 	
 	//bot commands object
@@ -370,7 +373,8 @@ var pluginObj = {
 		pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(pluginObj.isOp(data.ircData[1]) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != pluginId && plugin != 'simpleMsg') {pluginReload(plugin);}}}},
 		evaljs: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
 		pluginload: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
-		plugindisable: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}}
+		plugindisable: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
+		date: function (data) {var date = ''; switch (data.messageARGS[1]) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);}
 	},
 	
 	//bot pluggable functions object
