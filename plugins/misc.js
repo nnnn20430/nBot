@@ -28,7 +28,8 @@ var SettingsConstructor = function (modified) {
 			birthdays: true,
 			birthdaysCommandsOpOnly: true,
 			birthdaysRemindOnActivity: false,
-			birthdayData: {}
+			birthdayData: {},
+			statistics: false
 		};
 		for (attrname in modified) {settings[attrname]=modified[attrname];}
 		return settings;
@@ -40,12 +41,14 @@ var pluginObj = {
 	//initialize enabled misc features
 	miscFeatureInit: function () {
 		if (pluginSettings.birthdays) {pluginObj.birthdaysInit();}
+		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsInit();}
 	},
 	
 	//pass messages to enabled features
 	mainMiscMsgHandle: function (data) {
 		if (pluginSettings.mathHelper) {pluginObj.tryArithmeticEquation(data);}
 		if (pluginSettings.birthdays && pluginSettings.birthdaysRemindOnActivity) {pluginObj.birthdaysRemindCheck(data);}
+		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsTrack(data);}
 	},
 	
 	//try if the message is artithmetic equation ending with a "=" char
@@ -84,6 +87,7 @@ var pluginObj = {
 		return [years, days, hours, minutes, seconds];
 	},
 	
+	//parse years, days, hours, minutes, seconds to seconds
 	parseTimeToSeconds: function (string) {
 		var seconds = 0;
 		var match;
@@ -181,6 +185,7 @@ var pluginObj = {
 		}, 'age "user": known users age', pluginId);
 	},
 	
+	//birthdays remind check
 	birthdaysRemindCheckTrackerObj: {},
 	birthdaysRemindCheck: function (data) {
 		var bdaySec, bday;
@@ -200,7 +205,37 @@ var pluginObj = {
 				delete pluginObj.birthdaysRemindCheckTrackerObj[user][data.responseTarget];
 			}
 		}
-	}
+	},
+	
+	//channel message statistics init
+	channelMessageStatisticsInit: function () {
+		//add commands to commands plugin
+		var commandsPlugin = botObj.pluginData.commands.plugin;
+		commandsPlugin.commandAdd('msgstat', function (data) {
+			var i, sum = 0, message = '', channel = data.ircData[2];
+			for (i in pluginObj.channelMessageStatisticsObj[channel]) {
+				sum += +pluginObj.channelMessageStatisticsObj[channel][i];
+			}
+			for (i in pluginObj.channelMessageStatisticsObj[channel]) {
+				message += i+'('+Math.floor((pluginObj.channelMessageStatisticsObj[channel][i]/sum)*100)+'%), ';
+			}
+			if (message) {
+				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
+			}
+		}, 'msgstat: prints users percentage of messages in channel', pluginId);
+	},
+	
+	//channel message statistics
+	channelMessageStatisticsObj: {},
+	channelMessageStatisticsTrack: function (data) {
+		if (!pluginObj.channelMessageStatisticsObj[data.to]) {
+			pluginObj.channelMessageStatisticsObj[data.to] = {};
+		}
+		if (!pluginObj.channelMessageStatisticsObj[data.to][data.nick]) {
+			pluginObj.channelMessageStatisticsObj[data.to][data.nick] = 0;
+		}
+		pluginObj.channelMessageStatisticsObj[data.to][data.nick]++;
+	},
 };
 
 //exports
