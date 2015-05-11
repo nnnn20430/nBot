@@ -198,19 +198,18 @@ var pluginObj = {
 	},
 	
 	//bot command handle functions: handle simple bot commands
-	commandHandle: function (ircData, messageARGS) {
-		var command = messageARGS[0]||'', isCommand = false;
+	commandHandle: function (data) {
+		var command = data.messageARGS[0]||'', isCommand = false;
 		if (command.substr(0, pluginSettings.commandPrefix.length) == pluginSettings.commandPrefix) {
 			command = command.substr(pluginSettings.commandPrefix.length);
 			isCommand = true;
-		} else if (pluginSettings.commandPrefixIgnoreOnDirect && ircData[2].charAt(0) != '#') {
+		} else if (pluginSettings.commandPrefixIgnoreOnDirect && data.to.charAt(0) != '#') {
 			isCommand = true;
 		}
 		if (isCommand === true) {
-			var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) === null) {target = ircData[1];}
 			if (pluginObj.commandsObject[command] !== undefined) {
 				try {
-					pluginObj.commandsObject[command]({ircData: ircData, messageARGS: messageARGS, responseTarget: target});
+					pluginObj.commandsObject[command](data);
 				} catch (e) {
 					botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+pluginObj.getCommandOrigin(command)+'" is erroneous: ('+e+')');
 				}
@@ -270,12 +269,12 @@ var pluginObj = {
 	},
 	
 	//bot command handle functions: handle dynamic bot functions
-	dynamicFunctionHandle: function (ircData, messageARGS) {
+	dynamicFunctionHandle: function (data) {
 		var dynamicFunction;
 		for (var dynamicFunctionName in pluginSettings.dynamicFunctions) {
 			try {
-				dynamicFunction=eval("(function (data, messageARGS) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
-				dynamicFunction(ircData, messageARGS);
+				dynamicFunction=eval("(function (data) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
+				dynamicFunction(data);
 			} catch (e) {
 				botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous: ('+e+')');
 			}
@@ -283,10 +282,9 @@ var pluginObj = {
 	},
 	
 	//bot command handle functions: pluggable functions (to make it easier for plugins to add or remove functions)
-	pluggableFunctionHandle: function (ircData, messageARGS) {
-		var target = ircData[2]; if (new RegExp('^#.*$').exec(ircData[2]) === null) {target = ircData[1];}
+	pluggableFunctionHandle: function (data) {
 		for (var pluggableFunction in pluginObj.pluggableFunctionObject) {
-			pluginObj.pluggableFunctionObject[pluggableFunction]({ircData: ircData, messageARGS: messageARGS, responseTarget: target});
+			pluginObj.pluggableFunctionObject[pluggableFunction](data);
 		}
 	},
 	
@@ -328,7 +326,7 @@ var pluginObj = {
 		['responseremove', 'responseremove "trigger": remove a response from trigger (op only)'],
 		['responselist', 'responselist: prints list of responses (op only)'],
 		['responseclear', 'responsereclear: remove all set triggered responses (op only)'],
-		['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variables data=["rawmsg","nick","msgtarget","txt"] and messageARGS which is an array with txt interpreted as arguments)'],
+		['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variable data={rawdata, nick, to, message, messageARGS, responseTarget})'],
 		['functionremove', 'functionremove "name": remove a function named name (op only)'],
 		['functionlist', 'functionlist: prints list of functions (op only)'],
 		['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
@@ -342,7 +340,7 @@ var pluginObj = {
 	
 	//bot commands object
 	commandsObject: {
-		hug: function (data) {botF.ircSendCommandPRIVMSG('*Hugs '+data.ircData[1]+'*', data.responseTarget);},
+		hug: function (data) {botF.ircSendCommandPRIVMSG('*Hugs '+data.nick+'*', data.responseTarget);},
 		echo: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[1].replaceSpecialChars(), data.responseTarget);},
 		sendmsg: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[2].replaceSpecialChars(), data.messageARGS[1]);},
 		view: function (data) {if (data.messageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.messageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
@@ -352,36 +350,36 @@ var pluginObj = {
 		away: function (data) {botF.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
 		userlist: function (data) {if (data.messageARGS[1] == 'update') {botF.ircUpdateUsersInChannel(data.responseTarget);} else if (data.messageARGS[1] == 'count') {botF.ircSendCommandPRIVMSG(Object.keys(botObj.publicData.ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = botObj.publicData.ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += botF.ircModePrefixConvert('prefix', channelUsersObj[user].mode)+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; botF.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
 		origin: function (data) {if (pluginObj.commandsObject[data.messageARGS[1]] !== undefined) {botF.ircSendCommandPRIVMSG('Command "'+data.messageARGS[1]+'" is from plugin "'+pluginObj.getCommandOrigin(data.messageARGS[1])+'"', data.responseTarget);}},
-		raw: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botObj.ircConnection.write(data.messageARGS[1]+'\r\n');}},
-		savesettings: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
-		join: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {settings.channels.arrayValueAdd(data.messageARGS[1]);}},
-		part: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {settings.channels.arrayValueRemove(data.messageARGS[1]);botF.ircSendCommandPART(data.messageARGS[1], data.messageARGS[2]);} else if (pluginObj.isChanOp(data.ircData[1], data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.ircSendCommandPART(data.responseTarget);}},
-		login: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.authenticateOp(data.ircData[1], data.messageARGS[1]), data.responseTarget);},
-		logout: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.deAuthenticateOp(data.ircData[1]), data.responseTarget);},
-		op: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(pluginObj.giveOp(data.messageARGS[1], data.messageARGS[2]), data.responseTarget);}},
-		deop: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.ircSendCommandPRIVMSG(pluginObj.takeOp(data.messageARGS[1]), data.responseTarget);}},
-		helpall: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.getHelpAll(), data.ircData[1]);},
-		responseadd: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {pluginSettings.specificResponses[data.messageARGS[1]]=data.messageARGS[2];}},
-		responseremove: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {delete pluginSettings.specificResponses[data.messageARGS[1]];}},
-		responselist: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}botF.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
-		reponseclear: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {pluginSettings.specificResponses = {};}},
-		functionadd: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {pluginSettings.dynamicFunctions[data.messageARGS[1]]=data.messageARGS[2];}},
-		functionremove: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {delete pluginSettings.dynamicFunctions[data.messageARGS[1]];}},
-		functionlist: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
-		functionshow: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.messageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
-		pluginreload: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {if (botObj.pluginData[data.messageARGS[1]]) {botF.botPluginDisable(data.messageARGS[1]);botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');}}},
-		pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(pluginObj.isOp(data.ircData[1]) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != pluginId && plugin != 'simpleMsg') {pluginReload(plugin);}}}},
-		evaljs: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
-		pluginload: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
-		plugindisable: function (data) {if(pluginObj.isOp(data.ircData[1]) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
+		raw: function (data) {if(pluginObj.isOp(data.nick) === true) {botObj.ircConnection.write(data.messageARGS[1]+'\r\n');}},
+		savesettings: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
+		join: function (data) {if(pluginObj.isOp(data.nick) === true) {settings.channels.arrayValueAdd(data.messageARGS[1]);}},
+		part: function (data) {if(pluginObj.isOp(data.nick) === true) {settings.channels.arrayValueRemove(data.messageARGS[1]);botF.ircSendCommandPART(data.messageARGS[1], data.messageARGS[2]);} else if (pluginObj.isChanOp(data.nick, data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);botF.ircSendCommandPART(data.responseTarget);}},
+		login: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.authenticateOp(data.nick, data.messageARGS[1]), data.responseTarget);},
+		logout: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.deAuthenticateOp(data.nick), data.responseTarget);},
+		op: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.ircSendCommandPRIVMSG(pluginObj.giveOp(data.messageARGS[1], data.messageARGS[2]), data.responseTarget);}},
+		deop: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.ircSendCommandPRIVMSG(pluginObj.takeOp(data.messageARGS[1]), data.responseTarget);}},
+		helpall: function (data) {botF.ircSendCommandPRIVMSG(pluginObj.getHelpAll(), data.nick);},
+		responseadd: function (data) {if(pluginObj.isOp(data.nick) === true) {pluginSettings.specificResponses[data.messageARGS[1]]=data.messageARGS[2];}},
+		responseremove: function (data) {if(pluginObj.isOp(data.nick) === true) {delete pluginSettings.specificResponses[data.messageARGS[1]];}},
+		responselist: function (data) {if(pluginObj.isOp(data.nick) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}botF.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
+		reponseclear: function (data) {if(pluginObj.isOp(data.nick) === true) {pluginSettings.specificResponses = {};}},
+		functionadd: function (data) {if(pluginObj.isOp(data.nick) === true) {pluginSettings.dynamicFunctions[data.messageARGS[1]]=data.messageARGS[2];}},
+		functionremove: function (data) {if(pluginObj.isOp(data.nick) === true) {delete pluginSettings.dynamicFunctions[data.messageARGS[1]];}},
+		functionlist: function (data) {if(pluginObj.isOp(data.nick) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}botF.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
+		functionshow: function (data) {if(pluginObj.isOp(data.nick) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.messageARGS[1]]) !== undefined) {botF.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{botF.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
+		pluginreload: function (data) {if(pluginObj.isOp(data.nick) === true) {if (botObj.pluginData[data.messageARGS[1]]) {botF.botPluginDisable(data.messageARGS[1]);botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');}}},
+		pluginreloadall: function (data) {function pluginReload(plugin) {botF.botPluginDisable(plugin);botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');} if(pluginObj.isOp(data.nick) === true) {pluginReload(pluginId); for (var plugin in botObj.pluginData) {if (plugin != pluginId && plugin != 'simpleMsg') {pluginReload(plugin);}}}},
+		evaljs: function (data) {if(pluginObj.isOp(data.nick) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
+		pluginload: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
+		plugindisable: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
 		date: function (data) {var date = ''; switch (data.messageARGS[1]) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);}
 	},
 	
 	//bot pluggable functions object
 	pluggableFunctionObject: {
-		whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.ircData[3])) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); botF.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
-		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.ircData[3]) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.ircData[1], data.responseTarget);}},
-		ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.ircData[3]) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.responseTarget);}}
+		whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.message)) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); botF.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
+		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);}},
+		ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.responseTarget);}}
 	}
 };
 
@@ -418,9 +416,9 @@ module.exports.main = function (passedData) {
 	//add listeners to simpleMsg plugin
 	var simpleMsg = botObj.pluginData.simpleMsg.plugin;
 	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
-		pluginObj.commandHandle([data.rawmsg, data.nick, data.to, data.message], data.messageARGS);
-		pluginObj.dynamicFunctionHandle([data.rawmsg, data.nick, data.to, data.message], data.messageARGS);
-		pluginObj.pluggableFunctionHandle([data.rawmsg, data.nick, data.to, data.message], data.messageARGS);
+		pluginObj.commandHandle(data);
+		pluginObj.dynamicFunctionHandle(data);
+		pluginObj.pluggableFunctionHandle(data);
 		if (pluginSettings.specificResponses[data.message] !== undefined) {
 			botF.ircSendCommandPRIVMSG(pluginSettings.specificResponses[data.message], data.responseTarget);
 		}

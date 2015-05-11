@@ -144,7 +144,7 @@ var pluginObj = {
 		}, 'bday "user": get date of known users birthday', pluginId);
 		
 		commandsPlugin.commandAdd('bdayadd', function (data) {
-			if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.birthdaysCommandsOpOnly) {
+			if (commandsPlugin.isOp(data.nick) || !pluginSettings.birthdaysCommandsOpOnly) {
 				var user = data.messageARGS[1];
 				var date = new Date(data.messageARGS[2]);
 				if (botF.isNumeric(date.getTime())) {
@@ -154,7 +154,7 @@ var pluginObj = {
 		}, 'bdayadd "user" "date": add new birthday', pluginId);
 		
 		commandsPlugin.commandAdd('bdayremove', function (data) {
-			if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.birthdaysCommandsOpOnly) {
+			if (commandsPlugin.isOp(data.nick) || !pluginSettings.birthdaysCommandsOpOnly) {
 				var user = data.messageARGS[1];
 				if (pluginSettings.birthdayData[user]) {
 					delete pluginSettings.birthdayData[user];
@@ -212,7 +212,7 @@ var pluginObj = {
 		//add commands to commands plugin
 		var commandsPlugin = botObj.pluginData.commands.plugin;
 		commandsPlugin.commandAdd('msgstat', function (data) {
-			var i, sum = 0, message = '', channel = data.ircData[2];
+			var i, sum = 0, message = '', channel = data.to;
 			for (i in pluginObj.channelMessageStatisticsObj[channel]) {
 				sum += +pluginObj.channelMessageStatisticsObj[channel][i];
 			}

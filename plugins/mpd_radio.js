@@ -136,28 +136,28 @@ module.exports.main = function (passedData) {
 	}, 'np: shows currently playing song on the radio', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_play', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 			pluginObj.mpdSendCommand('play '+(+data.messageARGS[1]-1));
 			botF.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
 		}
 	}, 'mpd_play "pos": plays the song at position', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_random', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 			pluginObj.mpdSendCommand('random '+data.messageARGS[1]);
 			botF.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
 		}
 	}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_prio', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 			pluginObj.mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
 			botF.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
 		}
 	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_queue_song', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 				var pos = +data.messageARGS[1]-1, endpos = +data.messageARGS[2], prio = 255;
 				if (!data.messageARGS[2]) {
 					pluginObj.mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
@@ -175,7 +175,7 @@ module.exports.main = function (passedData) {
 	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_queue_songs', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 				var posArray = data.messageARGS[1].split(' ');
 				var commandString = 'random 0\nrandom 1\nprio 0 -1', pos, prio = 255;
 				for (pos in posArray) {
@@ -190,7 +190,7 @@ module.exports.main = function (passedData) {
 	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pluginId);
 	
 	commandsPlugin.commandAdd('mpd_raw', function (data) {
-		if (commandsPlugin.isOp(data.ircData[1]) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 			pluginObj.mpdSendCommand(data.messageARGS[1]);
 		}
 	}, 'mpd_raw "command": send command to mpd)', pluginId);
