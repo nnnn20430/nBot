@@ -11,6 +11,7 @@ var events = require('events');
 var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
+var dgram = require('dgram');
 
 var botObj;
 var pluginId;
@@ -236,6 +237,24 @@ var pluginObj = {
 		}
 		pluginObj.channelMessageStatisticsObj[data.to][data.nick]++;
 	},
+	
+	//send wake on lan magic packet with a mac addres on local broadcast
+	sendWoL: function (macAddr) {
+		var message = new Buffer('FFFFFFFFFFFF', 'hex'),
+			client = dgram.createSocket('udp4'),
+			macAddrBuffer = new Buffer(macAddr.split(':').join(''), 'hex'),
+			i = 0;
+		while (i < 16) {
+			message = new Buffer.concat([message, macAddrBuffer]);
+			i++;
+		}
+		client.bind(null, function () {
+			client.setBroadcast(true);
+			client.send(message, 0, message.length, 9, '255.255.255.255', function(err) {
+			  client.close();
+			});
+		});
+	}
 };
 
 //exports
@@ -283,4 +302,8 @@ module.exports.main = function (passedData) {
 		var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
 		botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
 	}, 'parsetime: parse seconds to years, days, hours, minutes, seconds', pluginId);
+	
+	commandsPlugin.commandAdd('sendwol', function (data) {
+		pluginObj.sendWoL(data.messageARGS[1]);
+	}, 'sendwol "mac": send wake on lan magic packet', pluginId);
 };
