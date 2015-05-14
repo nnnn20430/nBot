@@ -254,6 +254,170 @@ var pluginObj = {
 			  client.close();
 			});
 		});
+	},
+	
+	convertValue: function (from, to, value) {
+		var baseValue,
+			convertedValue,
+			valueType;
+		value = +value;
+			
+		switch (from) {
+			case 'bit':
+				baseValue = value;
+				valueType = 'digital_storage';
+				break;
+			case 'Kilobit':
+				baseValue = value*Math.pow(10, 3);
+				valueType = 'digital_storage';
+				break;
+			case 'Megabit':
+				baseValue = value*Math.pow(10, 6);
+				valueType = 'digital_storage';
+				break;
+			case 'Gigabit':
+				baseValue = value*Math.pow(10, 9);
+				valueType = 'digital_storage';
+				break;
+			case 'Terabit':
+				baseValue = value*Math.pow(10, 12);
+				valueType = 'digital_storage';
+				break;
+			case 'Petabit':
+				baseValue = value*Math.pow(10, 15);
+				valueType = 'digital_storage';
+				break;
+			case 'Kilobyte':
+				baseValue = value*(Math.pow(10, 3)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Megabyte':
+				baseValue = value*(Math.pow(10, 6)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Gigabyte':
+				baseValue = value*(Math.pow(10, 9)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Terabyte':
+				baseValue = value*(Math.pow(10, 12)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Petabyte':
+				baseValue = value*(Math.pow(10, 15)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Kibibit':
+				baseValue = value*1024;
+				valueType = 'digital_storage';
+				break;
+			case 'Mebibit':
+				baseValue = value*Math.pow(1024, 2);
+				valueType = 'digital_storage';
+				break;
+			case 'Gibibit':
+				baseValue = value*Math.pow(1024, 3);
+				valueType = 'digital_storage';
+				break;
+			case 'Tebibit':
+				baseValue = value*Math.pow(1024, 4);
+				valueType = 'digital_storage';
+				break;
+			case 'Pebibit':
+				baseValue = value*Math.pow(1024, 5);
+				valueType = 'digital_storage';
+				break;
+			case 'Kibibyte':
+				baseValue = value*(1024*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Mebibyte':
+				baseValue = value*(Math.pow(1024, 2)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Gibibyte':
+				baseValue = value*(Math.pow(1024, 3)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Tebibyte':
+				baseValue = value*(Math.pow(1024, 4)*8);
+				valueType = 'digital_storage';
+				break;
+			case 'Pebibyte':
+				baseValue = value*(Math.pow(1024, 5)*8);
+				valueType = 'digital_storage';
+				break;
+		}
+		
+		if (valueType == 'digital_storage') {
+			switch (to) {
+				case 'bit':
+					convertedValue = baseValue;
+					break;
+				case 'Kilobit':
+					convertedValue = baseValue/Math.pow(10, 3);
+					break;
+				case 'Megabit':
+					convertedValue = baseValue/Math.pow(10, 6);
+					break;
+				case 'Gigabit':
+					convertedValue = baseValue/Math.pow(10, 9);
+					break;
+				case 'Terabit':
+					convertedValue = baseValue/Math.pow(10, 12);
+					break;
+				case 'Petabit':
+					convertedValue = baseValue/Math.pow(10, 15);
+					break;
+				case 'Kilobyte':
+					convertedValue = baseValue/(Math.pow(10, 3)*8);
+					break;
+				case 'Megabyte':
+					convertedValue = baseValue/(Math.pow(10, 6)*8);
+					break;
+				case 'Gigabyte':
+					convertedValue = baseValue/(Math.pow(10, 9)*8);
+					break;
+				case 'Terabyte':
+					convertedValue = baseValue/(Math.pow(10, 12)*8);
+					break;
+				case 'Petabyte':
+					convertedValue = baseValue/(Math.pow(10, 15)*8);
+					break;
+				case 'Kibibit':
+					convertedValue = baseValue/1024;
+					break;
+				case 'Mebibit':
+					convertedValue = baseValue/Math.pow(1024, 2);
+					break;
+				case 'Gibibit':
+					convertedValue = baseValue/Math.pow(1024, 3);
+					break;
+				case 'Tebibit':
+					convertedValue = baseValue/Math.pow(1024, 4);
+					break;
+				case 'Pebibit':
+					convertedValue = baseValue/Math.pow(1024, 5);
+					break;
+				case 'Kibibyte':
+					convertedValue = baseValue/(1024*8);
+					break;
+				case 'Mebibyte':
+					convertedValue = baseValue/(Math.pow(1024, 2)*8);
+					break;
+				case 'Gibibyte':
+					convertedValue = baseValue/(Math.pow(1024, 3)*8);
+					break;
+				case 'Tebibyte':
+					convertedValue = baseValue/(Math.pow(1024, 4)*8);
+					break;
+				case 'Pebibyte':
+					convertedValue = baseValue/(Math.pow(1024, 5)*8);
+					break;
+			}
+		}
+		
+		return convertedValue;
 	}
 };
 
@@ -306,4 +470,8 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('sendwol', function (data) {
 		pluginObj.sendWoL(data.messageARGS[1]);
 	}, 'sendwol "mac": send wake on lan magic packet', pluginId);
+	
+	commandsPlugin.commandAdd('convert', function (data) {
+		botF.ircSendCommandPRIVMSG(pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3]), data.responseTarget);
+	}, 'convert "from" "to" "value": convert value to another', pluginId);
 };
