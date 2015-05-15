@@ -239,21 +239,24 @@ var pluginObj = {
 	},
 	
 	//send wake on lan magic packet with a mac addres on local broadcast
-	sendWoL: function (macAddr) {
-		var message = new Buffer('FFFFFFFFFFFF', 'hex'),
-			client = dgram.createSocket('udp4'),
-			macAddrBuffer = new Buffer(macAddr.split(':').join(''), 'hex'),
-			i = 0;
-		while (i < 16) {
-			message = new Buffer.concat([message, macAddrBuffer]);
-			i++;
-		}
-		client.bind(null, function () {
-			client.setBroadcast(true);
-			client.send(message, 0, message.length, 9, '255.255.255.255', function(err) {
-			  client.close();
+	sendWoL: function (macAddr, ipAddr) {
+		if (macAddr.match('[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}') !== null) {
+			var message = new Buffer('FFFFFFFFFFFF', 'hex'),
+				client = dgram.createSocket('udp4'),
+				macAddrBuffer = new Buffer(macAddr.split(':').join(''), 'hex'),
+				i = 0;
+			ipAddr = ipAddr||'255.255.255.255';
+			while (i < 16) {
+				message = new Buffer.concat([message, macAddrBuffer]);
+				i++;
+			}
+			client.bind(null, function () {
+				client.setBroadcast(true);
+				client.send(message, 0, message.length, 9, ipAddr, function(err) {
+				  client.close();
+				});
 			});
-		});
+		}
 	},
 	
 	convertValue: function (from, to, value) {
@@ -465,13 +468,13 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('parsetime', function (data) {
 		var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
 		botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
-	}, 'parsetime: parse seconds to years, days, hours, minutes, seconds', pluginId);
+	}, 'parsetime: parse "y d h m s" to seconds', pluginId);
 	
 	commandsPlugin.commandAdd('sendwol', function (data) {
-		pluginObj.sendWoL(data.messageARGS[1]);
-	}, 'sendwol "mac": send wake on lan magic packet', pluginId);
+		pluginObj.sendWoL(data.messageARGS[1], data.messageARGS[2]);
+	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
 	
 	commandsPlugin.commandAdd('convert', function (data) {
-		botF.ircSendCommandPRIVMSG(pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3]), data.responseTarget);
+		botF.ircSendCommandPRIVMSG(pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])||'Unable to convert.', data.responseTarget);
 	}, 'convert "from" "to" "value": convert value to another', pluginId);
 };
