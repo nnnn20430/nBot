@@ -213,12 +213,14 @@ var pluginObj = {
 		//add commands to commands plugin
 		var commandsPlugin = botObj.pluginData.commands.plugin;
 		commandsPlugin.commandAdd('msgstat', function (data) {
-			var i, sum = 0, message = '', channel = data.to;
-			for (i in pluginObj.channelMessageStatisticsObj[channel]) {
-				sum += +pluginObj.channelMessageStatisticsObj[channel][i];
+			var i, sum = 0, message = '', channel = data.to, statsObj = pluginObj.channelMessageStatisticsObj[channel], statsArray = [];
+			for (i in statsObj) {
+				statsArray.arrayValueAdd([i, statsObj[i]]);
+				sum += +statsObj[i];
 			}
-			for (i in pluginObj.channelMessageStatisticsObj[channel]) {
-				message += i+'('+Math.floor((pluginObj.channelMessageStatisticsObj[channel][i]/sum)*100)+'%), ';
+			statsArray = statsArray.sort(function (a, b) {return a[1] > b[1] ? -1 : 1;});
+			for (i in statsArray) {
+				message += statsArray[i][0]+'('+Math.floor((statsArray[i][1]/sum)*100)+'%), ';
 			}
 			if (message) {
 				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
@@ -456,6 +458,35 @@ module.exports.main = function (passedData) {
 	var simpleMsg = botObj.pluginData.simpleMsg.plugin;
 	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
 		pluginObj.mainMiscMsgHandle(data);
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
+		if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
+			delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
+		for (var i in data.channels) {
+			if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+				delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+			}
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+		for (var i in data.channels) {
+			if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+				pluginObj.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+				delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+			}
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
+		if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
+			delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+		}
 	});
 	
 	//add commands to commands plugin
