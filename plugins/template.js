@@ -2,6 +2,14 @@
 /*jshint evil: true*/
 
 "use strict";
+//reserved nBot variables
+var botObj;
+var pluginId;
+var botF;
+var settings;
+var pluginSettings;
+var ircChannelUsers;
+
 //variables
 var http = require('http');
 var net = require('net');
@@ -11,13 +19,7 @@ var events = require('events');
 var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
-
-var botObj;
-var pluginId;
-var botF;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var vm = require('vm');
 
 //settings constructor
 var SettingsConstructor = function (modified) {

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+/*jshint node: true*/
+/*jshint evil: true*/
+
 "use strict";
 //variables
 var http = require('http');
@@ -154,14 +157,34 @@ function terminalProcessInput(chunk) {
 		killAllnBotInstances(quitReason);
 	}
 	if (terminalCommandArgs[0] == '/connection') {
-		var connectionId = terminalCommandArgs[1];
-		for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
-		if (connectionsTmp[connectionId] !== undefined) {
-			terminalCurrentConnection = connectionId;
+		if (terminalCommandArgs[1] !== undefined) {
+			var connectionId = terminalCommandArgs[1];
+			for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
+			if (connectionsTmp[connectionId] !== undefined) {
+				terminalCurrentConnection = connectionId;
+			}
+		} else {
+			terminalLog('Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
 		}
 	}
 	if (terminalCommandArgs[0] == '/fakemsg') {
 		connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
+	}
+	if (terminalCommandArgs[0] == '/evaljs') {
+		eval("(function () {"+terminalCommandArgs[1]+"})")();
+	}
+	if (terminalCommandArgs[0] == '/help') {
+		terminalLog('> Commands are prefixed with "/", arguments must be in form of strings "" seperated by a space');
+		terminalLog('> arguments in square brackets "[]" are optional, Vertical bar "|" means "or"');
+		terminalLog('> /raw "data": write data to current irc connection');
+		terminalLog('> /join "#channel": join channel on current connection');
+		terminalLog('> /part "#channel": part channel on current connection');
+		terminalLog('> /say "#channel" "message": send message to channel on current connection');
+		terminalLog('> /quit ["reason"]: terminate the bot');
+		terminalLog('> /connection ["name"|"id"]: change current connection using name from settings or id strating from 0');
+		terminalLog('> /fakemsg "message": emit fake PRIVMSG bot event');
+		terminalLog('> /evaljs "code": evaluates node.js code');
+		terminalLog('> /help: print this message');
 	}
 	if (chunk.charAt(0) != '/') {
 		terminalLog('['+connectionName+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
@@ -805,7 +828,9 @@ function nBot_instance(settings, globalSettings) {
 			botF.emitBotEvent('botReceivedPART', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
-				delete ircChannelUsers[data[5]||data[3]][nick];
+				if (ircChannelUsers[data[5]||data[3]] && ircChannelUsers[data[5]||data[3]][nick]) {
+					delete ircChannelUsers[data[5]||data[3]][nick];
+				}
 			}
 		},
 		
@@ -856,9 +881,13 @@ function nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandleKICK: function (data) {
 			botF.emitBotEvent('botReceivedKICK', data);
-			var nick = data[1].split('!')[0];
+			var by = data[1].split('!')[0];
+			var channel = data[3].split(' ')[0];
+			var nick = data[3].split(' ')[1];
 			if (nick != settings.botName){
-				delete ircChannelUsers[data[3].split(' ')[0]][data[3].split(' ')[1]];
+				if (ircChannelUsers[channel] && ircChannelUsers[channel][nick]) {
+					delete ircChannelUsers[channel][nick];
+				}
 			}
 		},
 		
