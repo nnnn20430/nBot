@@ -380,7 +380,8 @@ var pluginObj = {
 	pluggableFunctionObject: {
 		whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.message)) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); botF.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
 		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);}},
-		ctcpversion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.responseTarget);}}
+		ctcpVersion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.responseTarget);}},
+		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {botF.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.responseTarget);}}
 	}
 };
 

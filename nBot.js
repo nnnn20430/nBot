@@ -495,14 +495,23 @@ function killAllnBotInstances(reason, force) {
 	}
 }
 
-//misc functions: handle irc message event from bot instance
-function botPRIVMSGEvent(connection, data) {
-	var connectionName = connections[connection].connectionName||connection;
-	debugLog('['+connectionName+':'+data[4]+'] '+data[1].split('!')[0]+': '+data[5]);
-	if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
-		ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
+//misc functions: handle irc bot event from bot instance
+var instanceBotEventHandleObj = {
+	PRIVMSG: function (connection, data) {
+		var connectionName = connections[connection].connectionName||connection;
+		debugLog('['+connectionName+':'+data[4]+'] <'+data[1].split('!')[0]+'>: '+data[5]);
+		if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
+			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
+		}
+	},
+	NOTICE: function (connection, data) {
+		var connectionName = connections[connection].connectionName||connection;
+		debugLog('[NOTICE('+connectionName+':'+data[4]+')] <'+data[1].split('!')[0]+'>: '+data[5]);
+		if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
+			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
+		}
 	}
-}
+};
 
 //misc functions: simple debug log
 function debugLog(data) {
@@ -1076,7 +1085,8 @@ botSettingsLoad(null, function (data) {
 	if(settings.ircRelayServerEnabled){ircRelayServerInit();}
 	function handleBotEvent(connection, event) {
 		switch (event.eventName) {
-			case 'botReceivedPRIVMSG': botPRIVMSGEvent(connection, event.eventData); break;
+			case 'botReceivedPRIVMSG': instanceBotEventHandleObj.PRIVMSG(connection, event.eventData); break;
+			case 'botReceivedNOTICE': instanceBotEventHandleObj.NOTICE(connection, event.eventData); break;
 		}
 	}
 	for (var connection in connections) {
