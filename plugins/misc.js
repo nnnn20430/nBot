@@ -424,6 +424,29 @@ var pluginObj = {
 		}
 		
 		return convertedValue;
+	},
+	
+	strTo1337: function (str) {
+		var strArray = str.split('');
+		var strChar;
+        var characterMap = {
+            'a': '4',
+            'b': '8',
+            'e': '3',
+            'g': '6',
+            'l': '1',
+            'o': '0',
+            's': '5',
+            't': '7'
+        };    
+		for (var leetChar in characterMap) {
+			for (strChar in strArray) {
+				if (strArray[strChar] == leetChar) {
+					strArray[strChar] = characterMap[leetChar];
+				}
+			}
+		}
+		return strArray.join('');
 	}
 };
 
@@ -509,4 +532,8 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('convert', function (data) {
 		botF.ircSendCommandPRIVMSG(pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])||'Unable to convert.', data.responseTarget);
 	}, 'convert "from" "to" "value": convert value to another', pluginId);
+	
+	commandsPlugin.commandAdd('1337', function (data) {
+		botF.ircSendCommandPRIVMSG(pluginObj.strTo1337(data.messageARGS[1]), data.responseTarget);
+	}, '1337 "text": convert text to 1337 text', pluginId);
 };
