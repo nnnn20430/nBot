@@ -353,6 +353,24 @@ var pluginObj = {
 				baseValue = value*(Math.pow(1024, 5)*8);
 				valueType = 'digital_storage';
 				break;
+			case 'Kelvin':
+				if (value >= 0) {
+					baseValue = value;
+					valueType = 'temperature';
+				}
+				break;
+			case 'Celsius':
+				if (value >= -273.15) {
+					baseValue = value+273.15;
+					valueType = 'temperature';
+				}
+				break;
+			case 'Fahrenheit':
+				if (value >= -459.67) {
+					baseValue = (value+459.67)*(5/9);
+					valueType = 'temperature';
+				}
+				break;
 		}
 		
 		if (valueType == 'digital_storage') {
@@ -422,6 +440,19 @@ var pluginObj = {
 					break;
 			}
 		}
+		if (valueType == 'temperature') {
+			switch (to) {
+			case 'Kelvin':
+				convertedValue = baseValue;
+				break;
+			case 'Celsius':
+				convertedValue = baseValue-273.15;
+				break;
+			case 'Fahrenheit':
+				convertedValue = baseValue*(9/5)-459.67;
+				break;
+			}
+		}
 		
 		return convertedValue;
 	},
@@ -429,16 +460,16 @@ var pluginObj = {
 	strTo1337: function (str) {
 		var strArray = str.split('');
 		var strChar;
-        var characterMap = {
-            'a': '4',
-            'b': '8',
-            'e': '3',
-            'g': '6',
-            'l': '1',
-            'o': '0',
-            's': '5',
-            't': '7'
-        };    
+		var characterMap = {
+			'a': '4',
+			'b': '8',
+			'e': '3',
+			'g': '6',
+			'l': '1',
+			'o': '0',
+			's': '5',
+			't': '7'
+		};    
 		for (var leetChar in characterMap) {
 			for (strChar in strArray) {
 				if (strArray[strChar] == leetChar) {
@@ -530,7 +561,8 @@ module.exports.main = function (passedData) {
 	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
 	
 	commandsPlugin.commandAdd('convert', function (data) {
-		botF.ircSendCommandPRIVMSG(pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])||'Unable to convert.', data.responseTarget);
+		var convertedValue;
+		botF.ircSendCommandPRIVMSG((convertedValue = pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
 	}, 'convert "from" "to" "value": convert value to another', pluginId);
 	
 	commandsPlugin.commandAdd('1337', function (data) {
