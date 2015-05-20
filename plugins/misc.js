@@ -602,4 +602,10 @@ module.exports.main = function (passedData) {
 				break;
 		}
 	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
+	
+	commandsPlugin.commandAdd('reverse', function (data) {
+		var txt = data.messageARGS[1], txtr = ''; 
+		var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
+		botF.ircSendCommandPRIVMSG(txtr, data.responseTarget)
+	}, 'reverse "text": reverse text', pluginId);
 };
