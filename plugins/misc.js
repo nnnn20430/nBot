@@ -40,6 +40,11 @@ var SettingsConstructor = function (modified) {
 
 //main plugin object
 var pluginObj = {
+	//variables
+	birthdaysRemindCheckTrackerObj: {},
+	channelMessageStatisticsObj: {},
+	countdownDataObj: {},
+	
 	//initialize enabled misc features
 	miscFeatureInit: function () {
 		if (pluginSettings.birthdays) {pluginObj.birthdaysInit();}
@@ -188,7 +193,6 @@ var pluginObj = {
 	},
 	
 	//birthdays remind check
-	birthdaysRemindCheckTrackerObj: {},
 	birthdaysRemindCheck: function (data) {
 		var bdaySec, bday;
 		for (var user in pluginSettings.birthdayData) {
@@ -230,7 +234,6 @@ var pluginObj = {
 	},
 	
 	//channel message statistics
-	channelMessageStatisticsObj: {},
 	channelMessageStatisticsTrack: function (data) {
 		if (!pluginObj.channelMessageStatisticsObj[data.to]) {
 			pluginObj.channelMessageStatisticsObj[data.to] = {};
@@ -568,4 +571,35 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('1337', function (data) {
 		botF.ircSendCommandPRIVMSG(pluginObj.strTo1337(data.messageARGS[1]), data.responseTarget);
 	}, '1337 "text": convert text to 1337 text', pluginId);
+	
+	commandsPlugin.commandAdd('countdown', function (data) {
+		var timeoutId;
+		var response = "";
+		var i;
+		var parsedTime;
+		var date = Math.round(new Date().getTime()/1000);
+		switch (data.messageARGS[1].toUpperCase()) {
+			case 'SET':
+				timeoutId = setTimeout(function () {
+					botF.ircSendCommandPRIVMSG('Countdown "'+data.messageARGS[2]+'" finished.', data.responseTarget);
+					delete pluginObj.countdownDataObj[data.messageARGS[2]];
+				}, data.messageARGS[3]*1000);
+				pluginObj.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
+				break;
+			case 'REMOVE':
+				delete pluginObj.countdownDataObj[data.messageARGS[2]];
+				break;
+			case 'LIST':
+				for (i in pluginObj.countdownDataObj) {
+					response += '"'+i+'", ';
+				}
+				botF.ircSendCommandPRIVMSG('Current countdowns: '+response.replace(/, $/, ".").replace(/^$/, 'No running countdowns.'), data.responseTarget);
+				break;
+			case 'SHOW':
+				parsedTime = pluginObj.parseSeconds(pluginObj.countdownDataObj[data.messageARGS[2]][1]-date);
+				console.log(pluginObj.countdownDataObj[data.messageARGS[2]][1]+' '+date);
+				botF.ircSendCommandPRIVMSG('Time left: '+parsedTime[0]+'y '+parsedTime[1]+'d '+parsedTime[2]+'h '+parsedTime[3]+'m '+parsedTime[4]+'s', data.responseTarget);
+				break;
+		}
+	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
 };
