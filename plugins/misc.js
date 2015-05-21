@@ -490,7 +490,18 @@ module.exports.plugin = pluginObj;
 //reserved functions
 
 //reserved functions: handle "botEvent" from bot (botEvent is used for irc related activity)
-//module.exports.botEvent = function (event) {};
+module.exports.botEvent = function (event) {
+	switch (event.eventName) {
+		case 'botPluginDisableEvent':
+			(function () {
+				for (var countdown in pluginObj.countdownDataObj) {
+					clearTimeout(pluginObj.countdownDataObj[countdown][0]);
+					delete pluginObj.countdownDataObj[countdown];
+				}
+			})();
+			break;
+	}
+};
 
 //reserved functions: main function called when plugin is loaded
 module.exports.main = function (passedData) {
@@ -587,6 +598,7 @@ module.exports.main = function (passedData) {
 				pluginObj.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
 				break;
 			case 'REMOVE':
+				clearTimeout(pluginObj.countdownDataObj[data.messageARGS[2]][0]);
 				delete pluginObj.countdownDataObj[data.messageARGS[2]];
 				break;
 			case 'LIST':
