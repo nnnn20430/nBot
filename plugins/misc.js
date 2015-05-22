@@ -618,6 +618,10 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('reverse', function (data) {
 		var txt = data.messageARGS[1], txtr = ''; 
 		var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
-		botF.ircSendCommandPRIVMSG(txtr, data.responseTarget)
+		botF.ircSendCommandPRIVMSG(txtr, data.responseTarget);
 	}, 'reverse "text": reverse text', pluginId);
+	
+	commandsPlugin.commandAdd('randomnumber', function (data) {
+		botF.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
+	}, 'randomnumber "min" "max": print random number', pluginId);
 };
