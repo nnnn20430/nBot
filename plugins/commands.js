@@ -6,6 +6,7 @@
 var botObj;
 var pluginId;
 var botF;
+var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -344,7 +345,7 @@ var pluginObj = {
 		hug: function (data) {botF.ircSendCommandPRIVMSG('*Hugs '+data.nick+'*', data.responseTarget);},
 		echo: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[1].replaceSpecialChars(), data.responseTarget);},
 		sendmsg: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[2].replaceSpecialChars(), data.messageARGS[1]);},
-		view: function (data) {if (data.messageARGS[1].substr(0, 'http'.length) == 'http') {http.get(url.parse(data.messageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
+		view: function (data) {if (data.messageARGS[1].substr(0, 'http://'.length) == 'http://') {http.get(url.parse(data.messageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
 		ping: function (data) {pluginObj.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString, data.responseTarget);});},
 		nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 		help: function (data) {if(data.messageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(pluginObj.commandHelp("commandInfo", data.messageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(pluginObj.getHelp(), data.responseTarget);}},
@@ -373,7 +374,7 @@ var pluginObj = {
 		evaljs: function (data) {if(pluginObj.isOp(data.nick) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
 		pluginload: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
 		plugindisable: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
-		date: function (data) {var date = ''; switch (data.messageARGS[1]) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);}
+		date: function (data) {var date = ''; switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);}
 	},
 	
 	//bot pluggable functions object
@@ -404,6 +405,7 @@ module.exports.main = function (passedData) {
 	botObj = passedData.botObj;
 	pluginId = passedData.id;
 	botF = botObj.publicData.botFunctions;
+	botV = botObj.publicData.botVariables;
 	settings = botObj.publicData.settings;
 	pluginSettings = settings.pluginsSettings[pluginId];
 	ircChannelUsers = botObj.publicData.ircChannelUsers;

@@ -6,6 +6,7 @@
 var botObj;
 var pluginId;
 var botF;
+var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -115,6 +116,7 @@ module.exports.main = function (passedData) {
 	botObj = passedData.botObj;
 	pluginId = passedData.id;
 	botF = botObj.publicData.botFunctions;
+	botV = botObj.publicData.botVariables;
 	settings = botObj.publicData.settings;
 	pluginSettings = settings.pluginsSettings[passedData.id];
 	ircChannelUsers = botObj.publicData.ircChannelUsers;

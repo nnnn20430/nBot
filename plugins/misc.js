@@ -6,6 +6,7 @@
 var botObj;
 var pluginId;
 var botF;
+var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -179,16 +180,19 @@ var pluginObj = {
 		
 		commandsPlugin.commandAdd('age', function (data) {
 			var user = data.messageARGS[1];
-			var bdaySec, bday, nextbday, nextbdayString;
+			var bdaySec, bday, fix, age = '';
 			var date = Math.round(new Date().getTime()/1000);
-			var age = '';
 			if (pluginSettings.birthdayData[user]) {
 				bdaySec = +pluginSettings.birthdayData[user];
-				age = pluginObj.parseSeconds(date-bdaySec);
+				bday = new Date(); bday.setTime(bdaySec*1000);
+				fix = pluginObj.parseTimeToSeconds((+pluginObj.leapYearRange(bday.getFullYear(), new Date().getFullYear()).length)+'d');
+				fix = fix>0?fix-pluginObj.parseTimeToSeconds('1d'):fix;
+				age = date-Math.round(bday.getTime()/1000);
+				age = age - fix;
+				age = pluginObj.parseSeconds(age);
 				age = age[0]+'y '+age[1]+'d '+age[2]+'h '+age[3]+'m '+age[4]+'s';
 				botF.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 			}
-			
 		}, 'age "user": known users age', pluginId);
 	},
 	
@@ -481,6 +485,20 @@ var pluginObj = {
 			}
 		}
 		return strArray.join('');
+	},
+	
+	isLeapYear: function (year) {
+		return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0));
+	},
+	
+	leapYearRange: function (start, end) {
+		var leapYears = [];
+		for (var i = start; i <= end; i++) {
+			if (pluginObj.isLeapYear(i)) {
+				leapYears.push(i);
+			}
+		}
+		return leapYears;
 	}
 };
 
@@ -509,6 +527,7 @@ module.exports.main = function (passedData) {
 	botObj = passedData.botObj;
 	pluginId = passedData.id;
 	botF = botObj.publicData.botFunctions;
+	botV = botObj.publicData.botVariables;
 	settings = botObj.publicData.settings;
 	pluginSettings = settings.pluginsSettings[pluginId];
 	ircChannelUsers = botObj.publicData.ircChannelUsers;
