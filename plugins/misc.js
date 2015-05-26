@@ -180,16 +180,13 @@ var pluginObj = {
 		
 		commandsPlugin.commandAdd('age', function (data) {
 			var user = data.messageARGS[1];
-			var bdaySec, bday, fix, age = '';
+			var bdaySec, bday, age, bdayLeap;
 			var date = Math.round(new Date().getTime()/1000);
 			if (pluginSettings.birthdayData[user]) {
 				bdaySec = +pluginSettings.birthdayData[user];
 				bday = new Date(); bday.setTime(bdaySec*1000);
-				fix = pluginObj.parseTimeToSeconds((+pluginObj.leapYearRange(bday.getFullYear(), new Date().getFullYear()).length)+'d');
-				fix = fix>0?fix-pluginObj.parseTimeToSeconds('1d'):fix;
-				age = date-Math.round(bday.getTime()/1000);
-				age = age - fix;
-				age = pluginObj.parseSeconds(age);
+				bdayLeap=Math.round(bday.getTime()/1000)+pluginObj.parseTimeToSeconds(pluginObj.leapYearRange(bday.getFullYear(), new Date().getFullYear()).splice(1).length+'d');
+				age = pluginObj.parseSeconds(date-bdayLeap);
 				age = age[0]+'y '+age[1]+'d '+age[2]+'h '+age[3]+'m '+age[4]+'s';
 				botF.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 			}
