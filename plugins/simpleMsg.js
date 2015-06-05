@@ -230,6 +230,7 @@ var pluginObj = {
 		}
 	},
 	
+	//message handling functions: handle KILL
 	msgParseKILL: function (data, callback) {
 		var nick = data[1].split('!')[0];
 		var reason = data[5]||data[3];
@@ -251,6 +252,7 @@ var pluginObj = {
 		//fix me (eh later im lazy)
 	},
 	
+	//message handling functions: handle RPL_WHOISUSER
 	msgParseNum311: function (data, callback) {
 		var line;
 		var params = data[1][0][3].split(' ');
@@ -297,6 +299,7 @@ var pluginObj = {
 		}
 	},
 	
+	//message handling functions: handle RPL_WHOREPLY
 	msgParseNum352: function (data, callback) {
 		var line;
 		var parsedData = {};
@@ -322,6 +325,7 @@ var pluginObj = {
 		}
 	},
 	
+	//message handling functions: handle RPL_NAMREPLY
 	msgParseNum353: function (data, callback) {
 		var channel = data[1][0][4];
 		var nicks = {};

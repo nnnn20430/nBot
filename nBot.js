@@ -152,7 +152,7 @@ function terminalProcessInput(chunk) {
 	}
 	if (terminalCommandArgs[0] == '/quit') {
 		var quitReason = terminalCommandArgs[1]||"Leaving";
-		terminalLog('quiting...');
+		terminalLog('quitting...');
 		setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
 		killAllnBotInstances(quitReason);
 	}
@@ -256,7 +256,7 @@ function initTerminalHandle() {
 				terminalUpdateBuffer();
 			}else if (chunk == "\x03") {
 				//^C
-				terminalLog('quiting...');
+				terminalLog('quitting...');
 				setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
 				killAllnBotInstances('stdin received ^C');
 			}else{
