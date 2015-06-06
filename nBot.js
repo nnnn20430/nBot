@@ -131,129 +131,131 @@ function terminalGetCursorPos(){
 function terminalProcessInput(chunk) {
 	var terminalCommandArgs = getArgsFromString(chunk)[0];
 	var connectionName = connections[terminalCurrentConnection].connectionName||terminalCurrentConnection;
-	switch (terminalCommandArgs[0]) {
-		case '/raw':
-			(function () {
-				connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');
-			})();
-			break;
-		case '/join':
-			(function () {
-				var botIsInChannel = false;
-				for (var channel in connections[terminalCurrentConnection].channels) {if (connections[terminalCurrentConnection].channels[channel] == terminalCommandArgs[1]) {botIsInChannel = true;}}
-				if (!botIsInChannel) {connections[terminalCurrentConnection].channels.arrayValueAdd(terminalCommandArgs[1]);}
-			})();
-			break;
-		case '/part':
-			(function () {
-				var partReason = "Leaving";
-				if (terminalCommandArgs[2] !== undefined) {partReason=terminalCommandArgs[2];}
-				connections[terminalCurrentConnection].channels.arrayValueRemove(terminalCommandArgs[1]);
-				connectionsTmp[terminalCurrentConnection].ircConnection.write('PART '+terminalCommandArgs[1]+' :'+partReason+'\r\n');
-			})();
-			break;
-		case '/say':
-			(function () {
-				if (terminalCommandArgs[2] !== undefined) {
-					terminalLog('['+connectionName+':'+terminalCommandArgs[1]+'] '+connections[terminalCurrentConnection].botName+': '+terminalCommandArgs[2]);
-					connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalCommandArgs[1]+' :'+terminalCommandArgs[2]+'\r\n');
-				}
-				terminalLastChannel = terminalCommandArgs[1];
-			})();
-			break;
-		case '/quit':
-			(function () {
-				var quitReason = terminalCommandArgs[1]||"Leaving";
-				terminalLog('quitting...');
-				setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
-				killAllnBotInstances(quitReason);
-			})();
-			break;
-		case '/connection':
-			(function () {
-				if (terminalCommandArgs[1] !== undefined) {
-					var connectionId = terminalCommandArgs[1];
-					for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
-					if (connectionsTmp[connectionId] !== undefined) {
-						terminalCurrentConnection = connectionId;
+	if (terminalCommandArgs[0].charAt(0) == '/') {
+		switch (terminalCommandArgs[0].split('').slice(1).join('')) {
+			case 'raw':
+				(function () {
+					connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');
+				})();
+				break;
+			case 'join':
+				(function () {
+					var botIsInChannel = false;
+					for (var channel in connections[terminalCurrentConnection].channels) {if (connections[terminalCurrentConnection].channels[channel] == terminalCommandArgs[1]) {botIsInChannel = true;}}
+					if (!botIsInChannel) {connections[terminalCurrentConnection].channels.arrayValueAdd(terminalCommandArgs[1]);}
+				})();
+				break;
+			case 'part':
+				(function () {
+					var partReason = "Leaving";
+					if (terminalCommandArgs[2] !== undefined) {partReason=terminalCommandArgs[2];}
+					connections[terminalCurrentConnection].channels.arrayValueRemove(terminalCommandArgs[1]);
+					connectionsTmp[terminalCurrentConnection].ircConnection.write('PART '+terminalCommandArgs[1]+' :'+partReason+'\r\n');
+				})();
+				break;
+			case 'say':
+				(function () {
+					if (terminalCommandArgs[2] !== undefined) {
+						terminalLog('['+connectionName+':'+terminalCommandArgs[1]+'] '+connections[terminalCurrentConnection].botName+': '+terminalCommandArgs[2]);
+						connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalCommandArgs[1]+' :'+terminalCommandArgs[2]+'\r\n');
 					}
-				} else {
-					terminalLog('Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
-				}
-			})();
-			break;
-		case '/fakemsg':
-			(function () {
-				connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
-			})();
-			break;
-		case '/evaljs':
-			(function () {
-				eval("(function () {"+terminalCommandArgs[1]+"})")();
-			})();
-			break;
-		case '/help':
-			(function () {
-				terminalLog('> Commands are prefixed with "/", arguments must be in form of strings "" seperated by a space');
-				terminalLog('> arguments in square brackets "[]" are optional, Vertical bar "|" means "or"');
-				terminalLog('> /raw "data": write data to current irc connection');
-				terminalLog('> /join "#channel": join channel on current connection');
-				terminalLog('> /part "#channel": part channel on current connection');
-				terminalLog('> /say "#channel" "message": send message to channel on current connection');
-				terminalLog('> /quit ["reason"]: terminate the bot');
-				terminalLog('> /connection ["name"|"id"]: change current connection using name from settings or id starting from 0');
-				terminalLog('> /fakemsg "message": emit fake PRIVMSG bot event');
-				terminalLog('> /evaljs "code": evaluates node.js code');
-				terminalLog('> /help: print this message');
-				terminalLog('> /pluginreload "id": reload plugin with id');
-				terminalLog('> /pluginreloadall: reload all plugins');
-				terminalLog('> /pluginload "plugin": load a plugin');
-				terminalLog('> /plugindisable "plugin": disable a loaded plugin');
-			})();
-			break;
-		case '/pluginreload':
-			(function () {
-				var botObj = connectionsTmp[terminalCurrentConnection];
-				var botF = botObj.publicData.botFunctions;
-				var settings = botObj.publicData.settings;
-				if (botObj.pluginData[terminalCommandArgs[1]]) {
-					botF.botPluginDisable(terminalCommandArgs[1]);
+					terminalLastChannel = terminalCommandArgs[1];
+				})();
+				break;
+			case 'quit':
+				(function () {
+					var quitReason = terminalCommandArgs[1]||"Leaving";
+					terminalLog('quitting...');
+					setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
+					killAllnBotInstances(quitReason);
+				})();
+				break;
+			case 'connection':
+				(function () {
+					if (terminalCommandArgs[1] !== undefined) {
+						var connectionId = terminalCommandArgs[1];
+						for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
+						if (connectionsTmp[connectionId] !== undefined) {
+							terminalCurrentConnection = connectionId;
+						}
+					} else {
+						terminalLog('Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
+					}
+				})();
+				break;
+			case 'fakemsg':
+				(function () {
+					connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
+				})();
+				break;
+			case 'evaljs':
+				(function () {
+					eval("(function () {"+terminalCommandArgs[1]+"})")();
+				})();
+				break;
+			case 'help':
+				(function () {
+					terminalLog('> Commands are prefixed with "/", arguments must be in form of strings "" seperated by a space');
+					terminalLog('> arguments in square brackets "[]" are optional, Vertical bar "|" means "or"');
+					terminalLog('> /raw "data": write data to current irc connection');
+					terminalLog('> /join "#channel": join channel on current connection');
+					terminalLog('> /part "#channel": part channel on current connection');
+					terminalLog('> /say "#channel" "message": send message to channel on current connection');
+					terminalLog('> /quit ["reason"]: terminate the bot');
+					terminalLog('> /connection ["name"|"id"]: change current connection using name from settings or id starting from 0');
+					terminalLog('> /fakemsg "message": emit fake PRIVMSG bot event');
+					terminalLog('> /evaljs "code": evaluates node.js code');
+					terminalLog('> /help: print this message');
+					terminalLog('> /pluginreload "id": reload plugin with id');
+					terminalLog('> /pluginreloadall: reload all plugins');
+					terminalLog('> /pluginload "plugin": load a plugin');
+					terminalLog('> /plugindisable "plugin": disable a loaded plugin');
+				})();
+				break;
+			case 'pluginreload':
+				(function () {
+					var botObj = connectionsTmp[terminalCurrentConnection];
+					var botF = botObj.publicData.botFunctions;
+					var settings = botObj.publicData.settings;
+					if (botObj.pluginData[terminalCommandArgs[1]]) {
+						botF.botPluginDisable(terminalCommandArgs[1]);
+						botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
+					}
+				})();
+				break;
+			case 'pluginreloadall':
+				(function () {
+					var botObj = connectionsTmp[terminalCurrentConnection];
+					var botF = botObj.publicData.botFunctions;
+					var settings = botObj.publicData.settings;
+					function pluginReload(plugin) {
+						botF.botPluginDisable(plugin);
+						botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
+					}
+					for (var plugin in botObj.pluginData) {
+						pluginReload(plugin);
+					}
+				})();
+				break;
+			case 'pluginload':
+				(function () {
+					var botObj = connectionsTmp[terminalCurrentConnection];
+					var botF = botObj.publicData.botFunctions;
+					var settings = botObj.publicData.settings;
 					botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
-				}
-			})();
-			break;
-		case '/pluginreloadall':
-			(function () {
-				var botObj = connectionsTmp[terminalCurrentConnection];
-				var botF = botObj.publicData.botFunctions;
-				var settings = botObj.publicData.settings;
-				function pluginReload(plugin) {
-					botF.botPluginDisable(plugin);
-					botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
-				}
-				for (var plugin in botObj.pluginData) {
-					pluginReload(plugin);
-				}
-			})();
-			break;
-		case 'pluginload':
-			(function () {
-				var botObj = connectionsTmp[terminalCurrentConnection];
-				var botF = botObj.publicData.botFunctions;
-				var settings = botObj.publicData.settings;
-				botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
-				settings.plugins.arrayValueAdd(terminalCommandArgs[1]);
-			})();
-			break;
-		case 'plugindisable':
-			(function () {
-				var botObj = connectionsTmp[terminalCurrentConnection];
-				var botF = botObj.publicData.botFunctions;
-				var settings = botObj.publicData.settings;
-				botF.botPluginDisable(terminalCommandArgs[1]);
-				settings.plugins.arrayValueRemove(terminalCommandArgs[1]);
-			})();
-			break;
+					settings.plugins.arrayValueAdd(terminalCommandArgs[1]);
+				})();
+				break;
+			case 'plugindisable':
+				(function () {
+					var botObj = connectionsTmp[terminalCurrentConnection];
+					var botF = botObj.publicData.botFunctions;
+					var settings = botObj.publicData.settings;
+					botF.botPluginDisable(terminalCommandArgs[1]);
+					settings.plugins.arrayValueRemove(terminalCommandArgs[1]);
+				})();
+				break;
+		}
 	}
 	if (chunk.charAt(0) != '/') {
 		terminalLog('['+connectionName+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
@@ -350,7 +352,15 @@ Object.defineProperty(Array.prototype, "diff", {
 
 Object.defineProperty(String.prototype, "replaceSpecialChars", { 
     value: function(a) {
-		return this.replace(/#csi;/g, '\x1B[').replace(/#c;/g, '\x03').replace(/#reset;/g, '\x0F').replace(/#underline;/g, '\x1F').replace(/#bold;/g, '\x02').replace(/#italic;/g, '\x16').replace(new RegExp('#x([0-9a-fA-F]{2});', 'g'), function(regex, hex){return hex.fromHex();}).replace(new RegExp('#u([0-9a-fA-F]{4});', 'g'), function(regex, hex){return hex.fromUtf8Hex();});
+		return this
+			.replace(/#csi;/g, '\x1B[')
+			.replace(/#c;/g, '\x03')
+			.replace(/#reset;/g, '\x0F')
+			.replace(/#underline;/g, '\x1F')
+			.replace(/#bold;/g, '\x02')
+			.replace(/#italic;/g, '\x16')
+			.replace(new RegExp('#x([0-9a-fA-F]{2});', 'g'), function(regex, hex){return hex.fromHex();})
+			.replace(new RegExp('#u([0-9a-fA-F]{4});', 'g'), function(regex, hex){return hex.fromUtf8Hex();});
     },
     configurable: true,
     writable: true,
@@ -618,7 +628,7 @@ function nBot_instance(settings, globalSettings) {
 		}
 	});
 	
-	//bot variable bject
+	//bot variable object
 	var botV = {
 		ircSupportedUserModesArray: [
 			['o', '@'],
