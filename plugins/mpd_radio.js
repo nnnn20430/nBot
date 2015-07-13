@@ -80,7 +80,7 @@ var pluginObj = {
 				var currentSongName = new RegExp('file: (?:[^\/]*\/)*(.*)').exec(currentsongLines[0]);
 				var currentSongPos = currentsongLines.filter(function (element, index, array) {if (element.substr(0, 'Pos: '.length) == 'Pos: ') {return true;}})[0]; if (currentSongPos) {currentSongPos=+currentSongPos.substr('Pos: '.length)+1;}
 				if (currentSongName !== null) {
-					callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at http://mindcraft.si.eu.org/radio/');
+					callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at '+pluginSettings.tuneinUrl);
 				}
 			}
 		}

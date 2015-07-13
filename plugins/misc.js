@@ -32,7 +32,8 @@ var SettingsConstructor = function (modified) {
 			birthdaysCommandsOpOnly: true,
 			birthdaysRemindOnActivity: false,
 			birthdayData: {},
-			statistics: false
+			statistics: false,
+			hostnameHistory: false
 		};
 		for (attrname in modified) {settings[attrname]=modified[attrname];}
 		return settings;
@@ -45,11 +46,13 @@ var pluginObj = {
 	birthdaysRemindCheckTrackerObj: {},
 	channelMessageStatisticsObj: {},
 	countdownDataObj: {},
+	hostHistoryData: {},
 	
 	//initialize enabled misc features
 	miscFeatureInit: function () {
 		if (pluginSettings.birthdays) {pluginObj.birthdaysInit();}
 		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsInit();}
+		if (pluginSettings.hostnameHistory) {pluginObj.hostnameHistoryInit();}
 	},
 	
 	//pass messages to enabled features
@@ -57,12 +60,13 @@ var pluginObj = {
 		if (pluginSettings.mathHelper) {pluginObj.tryArithmeticEquation(data);}
 		if (pluginSettings.birthdays && pluginSettings.birthdaysRemindOnActivity) {pluginObj.birthdaysRemindCheck(data);}
 		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsTrack(data);}
+		if (pluginSettings.hostnameHistory) {pluginObj.hostnameHistoryTrack(data);}
 	},
 	
 	//try if the message is artithmetic equation ending with a "=" char
 	tryArithmeticEquation: function (data) {
 		if (data.message.charAt(data.message.length-1) == '=') {
-			if (botF.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=)/g, ''))) {
+			if (botF.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=|\.)/g, ''))) {
 				try {
 					botF.ircSendCommandPRIVMSG('='+eval(data.message.substr(0, data.message.length-1)), data.responseTarget);
 				} catch (e) {
@@ -74,7 +78,7 @@ var pluginObj = {
 	
 	//parse seconds to years, days, hours, minutes, seconds
 	parseSeconds: function (s) {
-		var seconds = s;
+		var seconds = +s;
 		var secMinute = 1 * 60;
 		var secHour = secMinute * 60;
 		var secDay = secHour * 24;
@@ -226,7 +230,7 @@ var pluginObj = {
 			}
 			statsArray = statsArray.sort(function (a, b) {return a[1] > b[1] ? -1 : 1;});
 			for (i in statsArray) {
-				message += statsArray[i][0]+'('+Math.floor((statsArray[i][1]/sum)*100)+'%), ';
+				message += statsArray[i][0]+'('+Math.ceil(((statsArray[i][1]/sum)*100)*100)/100+'%), ';
 			}
 			if (message) {
 				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
@@ -273,8 +277,12 @@ var pluginObj = {
 		value = +value;
 			
 		switch (from) {
-			case 'bit':
+			case 'Bit':
 				baseValue = value;
+				valueType = 'digital_storage';
+				break;
+			case 'Byte':
+				baseValue = value*8;
 				valueType = 'digital_storage';
 				break;
 			case 'Kilobit':
@@ -379,8 +387,11 @@ var pluginObj = {
 		
 		if (valueType == 'digital_storage') {
 			switch (to) {
-				case 'bit':
+				case 'Bit':
 					convertedValue = baseValue;
+					break;
+				case 'Byte':
+					convertedValue = baseValue/8;
 					break;
 				case 'Kilobit':
 					convertedValue = baseValue/Math.pow(10, 3);
@@ -496,6 +507,37 @@ var pluginObj = {
 			}
 		}
 		return leapYears;
+	},
+	
+	hostnameHistoryInit: function () {
+		var commandsPlugin = botObj.pluginData.commands.plugin;
+		commandsPlugin.commandAdd('hosthistory', function (data) {
+			var hostHistoryData = pluginObj.hostHistoryData;
+			var message = 'Known nicknames for host: ';
+			for (var nick in hostHistoryData[data.messageARGS[1]]) {
+				message += hostHistoryData[data.messageARGS[1]][nick]+', ';
+			}
+			if (message != 'Known nicknames for host: ') {
+				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
+			}
+		}, 'hosthistory "hostname": prints list of known nicknames associated with the hostname', pluginId);
+	},
+	
+	hostnameHistoryTrack: function (data) {
+		var hostname = data.rawdata[0].split(' ')[0].split('@')[1];
+		var hostHistoryData = pluginObj.hostHistoryData;
+		var nickKnown = false;
+		if (hostHistoryData[hostname] === undefined) {
+			hostHistoryData[hostname] = [];
+		}
+		for (var nick in hostHistoryData[hostname]) {
+			if (hostHistoryData[hostname][nick] == data.nick) {
+				nickKnown = true;
+			}
+		}
+		if (!nickKnown) {
+			hostHistoryData[hostname].arrayValueAdd(data.nick);
+		}
 	}
 };
 
@@ -579,12 +621,12 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('parseseconds', function (data) {
 		var parsedTime = pluginObj.parseSeconds(data.messageARGS[1]);
 		botF.ircSendCommandPRIVMSG(parsedTime[0]+'y '+parsedTime[1]+'d '+parsedTime[2]+'h '+parsedTime[3]+'m '+parsedTime[4]+'s', data.responseTarget);
-	}, 'parseseconds: parse seconds to years, days, hours, minutes, seconds', pluginId);
+	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
 	
 	commandsPlugin.commandAdd('parsetime', function (data) {
 		var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
 		botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
-	}, 'parsetime: parse "y d h m s" to seconds', pluginId);
+	}, 'parsetime "time": parse "y d h m s" to seconds', pluginId);
 	
 	commandsPlugin.commandAdd('sendwol', function (data) {
 		pluginObj.sendWoL(data.messageARGS[1], data.messageARGS[2]);
@@ -640,4 +682,9 @@ module.exports.main = function (passedData) {
 	commandsPlugin.commandAdd('randomnumber', function (data) {
 		botF.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
 	}, 'randomnumber "min" "max": print random number', pluginId);
+	
+	commandsPlugin.commandAdd('uptime', function (data) {
+		var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
+		botF.ircSendCommandPRIVMSG('Uptime: '+upTime[0]+'y '+upTime[1]+'d '+upTime[2]+'h '+upTime[3]+'m '+upTime[4]+'s', data.responseTarget);
+	}, 'uptime: print time passed since nBot process was started', pluginId);
 };

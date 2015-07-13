@@ -53,17 +53,19 @@ var pluginObj = {
 	//misc plugin functions: ping the server by connecting and quickly closing
 	pingTcpServer: function (host, port, callback){
 		var isFinished = false;
-		function returnResults(data) {if (!isFinished) {callback(data); isFinished = true;}}
+		var timeA, timeB = new Date().getTime();
+		function returnResults(status, info) {if (!isFinished) {callback(status, info); isFinished = true;}}
 		if (port > 0 && port < 65536) {
 			var pingHost = net.connect({port: port, host: host}, function () {
-				returnResults(true);
+				timeA = new Date().getTime();
+				returnResults(true, timeA-timeB);
 				pingHost.end();pingHost.destroy();
 			});
 			pingHost.setTimeout(5*1000);
-			pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false);});
-			pingHost.on('error', function () {pingHost.end();pingHost.destroy();returnResults(false);});
-			pingHost.on('close', function () {returnResults(false);});
-		} else {returnResults(false);}
+			pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false, 'timeout');});
+			pingHost.on('error', function (e) {pingHost.end();pingHost.destroy();returnResults(false, 'error: ('+e+')');});
+			pingHost.on('close', function () {returnResults(false, 'closed');});
+		} else {returnResults(false, 'error: port out of range');}
 	},
 	
 	//misc plugin functions: return entire help
@@ -337,7 +339,8 @@ var pluginObj = {
 		['evaljs', 'evaljs "code": evaluates node.js code (op only)'],
 		['pluginload', 'pluginload "plugin": load a plugin (op only)'],
 		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
-		['date', 'date ["UTC"|"UNIX"]: get current date']
+		['date', 'date ["UTC"|"UNIX"]: get current date'],
+		['sh', 'sh "shell expresion": run commands through /bin/sh']
 	],
 	
 	//bot commands object
@@ -346,7 +349,7 @@ var pluginObj = {
 		echo: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[1].replaceSpecialChars(), data.responseTarget);},
 		sendmsg: function (data) {botF.ircSendCommandPRIVMSG(data.messageARGS[2].replaceSpecialChars(), data.messageARGS[1]);},
 		view: function (data) {if (data.messageARGS[1].substr(0, 'http://'.length) == 'http://') {http.get(url.parse(data.messageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){botF.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {botF.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
-		ping: function (data) {pluginObj.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString, data.responseTarget);});},
+		ping: function (data) {pluginObj.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status, info) {var statusString; if(status){statusString="open";}else{statusString="closed";}botF.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString+", "+(botF.isNumeric(info)?info+"ms":info), data.responseTarget);});},
 		nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 		help: function (data) {if(data.messageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(pluginObj.commandHelp("commandInfo", data.messageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(pluginObj.getHelp(), data.responseTarget);}},
 		away: function (data) {botF.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
@@ -374,15 +377,17 @@ var pluginObj = {
 		evaljs: function (data) {if(pluginObj.isOp(data.nick) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
 		pluginload: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
 		plugindisable: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
-		date: function (data) {var date = ''; switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);}
+		date: function (data) {var date = ''; switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'UTC': date = new Date().toUTCString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);},
+		sh: function (data) {if(pluginObj.isOp(data.nick) === true) {exec(data.messageARGS[1], function(error, stdout, stderr){botF.ircSendCommandPRIVMSG(stdout.replace(/\n/g, ' ;; '), data.responseTarget);});}}
 	},
 	
 	//bot pluggable functions object
 	pluggableFunctionObject: {
 		whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.message)) !== null) {botF.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); botF.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
 		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);}},
-		ctcpVersion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.responseTarget);}},
-		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {botF.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.responseTarget);}}
+		ctcpVersion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.nick);}},
+		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {botF.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.nick);}},
+		ctcpTime: function (data) {if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);}}
 	}
 };
 

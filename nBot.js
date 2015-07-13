@@ -173,13 +173,24 @@ function terminalProcessInput(chunk) {
 			case 'connection':
 				(function () {
 					if (terminalCommandArgs[1] !== undefined) {
-						var connectionId = terminalCommandArgs[1];
-						for (var connection in connections) {if (connections[connection].connectionName == terminalCommandArgs[1]) {connectionId = connection;}}
-						if (connectionsTmp[connectionId] !== undefined) {
-							terminalCurrentConnection = connectionId;
+						var connection;
+						if (terminalCommandArgs[1].toUpperCase() == 'SET') {
+							var connectionId = terminalCommandArgs[2];
+							for (connection in connections) {
+								if (connections[connection].connectionName == connectionId) {connectionId = connection;}
+							}
+							if (connectionsTmp[connectionId] !== undefined) {
+								terminalCurrentConnection = connectionId;
+							}
+						}
+						if (terminalCommandArgs[1].toUpperCase() == 'LIST') {
+							terminalLog('> Connection list:');
+							for (connection in connections) {
+								terminalLog('> id: '+connection+', name: '+connections[connection].connectionName);
+							}
 						}
 					} else {
-						terminalLog('Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
+						terminalLog('> Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
 					}
 				})();
 				break;
@@ -202,7 +213,7 @@ function terminalProcessInput(chunk) {
 					terminalLog('> /part "#channel": part channel on current connection');
 					terminalLog('> /say "#channel" "message": send message to channel on current connection');
 					terminalLog('> /quit ["reason"]: terminate the bot');
-					terminalLog('> /connection ["name"|"id"]: change current connection using name from settings or id starting from 0');
+					terminalLog('> /connection [LIST|SET ["name"|"id"]]: change current connection using name from settings or id starting from 0');
 					terminalLog('> /fakemsg "message": emit fake PRIVMSG bot event');
 					terminalLog('> /evaljs "code": evaluates node.js code');
 					terminalLog('> /help: print this message');
@@ -210,6 +221,12 @@ function terminalProcessInput(chunk) {
 					terminalLog('> /pluginreloadall: reload all plugins');
 					terminalLog('> /pluginload "plugin": load a plugin');
 					terminalLog('> /plugindisable "plugin": disable a loaded plugin');
+					terminalLog('> /savesettings: save current settings to file');
+					terminalLog('> /loadsettings: load settings from file (reloads all plugins on all current connections)');
+					terminalLog('> /connectioncreate: creates new connection entry in settings');
+					terminalLog('> /connectiondelete ["name"|"id"]: deletes connection entry from settings');
+					terminalLog('> /connectioninit ["name"|"id"]: starts new bot connection from settings');
+					terminalLog('> /connectionkill ["name"|"id"]: kills running bot instance');
 				})();
 				break;
 			case 'pluginreload':
@@ -253,6 +270,78 @@ function terminalProcessInput(chunk) {
 					var settings = botObj.publicData.settings;
 					botF.botPluginDisable(terminalCommandArgs[1]);
 					settings.plugins.arrayValueRemove(terminalCommandArgs[1]);
+				})();
+				break;
+			case 'savesettings':
+				(function () {
+					botSettingsSave(null, null, function () {
+						terminalLog('Settings saved!');
+					});
+				})();
+				break;
+			case 'loadsettings':
+				(function () {
+					botSettingsLoad(null, function (data) {
+						settings = data;
+						connections = settings.connections;
+						function pluginReload(botObj, plugin) {
+							var botF = botObj.publicData.botFunctions;
+							var settings = botObj.publicData.settings;
+							botF.botPluginDisable(plugin);
+							botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
+						}
+						for (var connection in connectionsTmp) {
+							var botObj = connectionsTmp[connection];
+							for (var plugin in botObj.pluginData) {
+								pluginReload(botObj, plugin);
+							}
+						}
+						terminalLog('Settings loaded!');
+					});
+				})();
+				break;
+			case 'connectioncreate':
+				(function () {
+					connections.splice(connections.length, 0, 
+						new SettingsConstructor.connection({
+							connectionName: 'Connection'+connections.length
+						})
+					);
+					botSettingsSave(null, null, function () {
+						terminalLog('Connection created and written to settings');
+						terminalLog('modify the connection then load the changes using /loadsettings');
+						terminalLog('then initialize the connection using /connectioninit');
+					});
+				})();
+				break;
+			case 'connectiondelete':
+				(function () {
+					var connectionId = terminalCommandArgs[1];
+					for (var connection in connections) {
+						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
+					}
+					connections.splice(connectionId, 1);
+					terminalLog('Connection deleted');
+					terminalLog('confirm this by saving settings using /savesettings');
+
+				})();
+				break;
+			case 'connectioninit':
+				(function () {
+					var connectionId = terminalCommandArgs[1];
+					for (var connection in connections) {
+						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
+					}
+					nBotConnectionInit(connectionId);
+				})();
+				break;
+			case 'connectionkill':
+				(function () {
+					var connectionId = terminalCommandArgs[1];
+					for (var connection in connections) {
+						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
+					}
+					connectionsTmp[connectionId].kill();
 				})();
 				break;
 		}
@@ -611,6 +700,24 @@ function handleBotDebugMessageEvent(connection, data) {
 	}
 }
 
+//misc functions: start a nBot connection for settings using id
+function nBotConnectionInit(connectionId) {
+	/*jshint -W055 */
+	function handleBotEvent(event) {
+		switch (event.eventName) {
+			case 'botReceivedPRIVMSG': instanceBotEventHandleObj.PRIVMSG(connectionId, event.eventData); break;
+			case 'botReceivedNOTICE': instanceBotEventHandleObj.NOTICE(connectionId, event.eventData); break;
+		}
+	}
+	function handlebotDebugMessage(data) {
+		handleBotDebugMessageEvent(connectionId, data);
+	}
+	connectionsTmp[connectionId]=new nBot_instance(connections[connectionId], settings);
+	connectionsTmp[connectionId].init();
+	connectionsTmp[connectionId].botEventsEmitter.on('botEvent', handleBotEvent);
+	connectionsTmp[connectionId].botEventsEmitter.on('botDebugMessage', handlebotDebugMessage);
+}
+
 //main bot class
 function nBot_instance(settings, globalSettings) {
 	var ircConnection;
@@ -697,19 +804,32 @@ function nBot_instance(settings, globalSettings) {
 		//misc bot functions: update tracked user data in channel
 		ircUpdateUsersInChannel: function (channel, callback) {
 			function ircUpdateTrackedUsersFromWhoMessage(data) {
-				var whoData, whoDataObject = {}, channel = data[1][0][3].split(' ')[1];
-				for (var line in data[1]) {
+				var line;
+				var parsedData = {};
+				var params;
+				for (line in data[1]) {
 					if (data[1][line][2] == 352) {
-						whoData = data[1][line][3].split(' ');
-						whoDataObject[whoData[5]] = {};
-						if ((ircChannelUsers[whoData[1]] && ircChannelUsers[whoData[1]][whoData[5]]) !== undefined) {whoDataObject[whoData[5]] = ircChannelUsers[whoData[1]][whoData[5]];}
-						if (whoData[6].charAt(0) == "H") {whoDataObject[whoData[5]].isHere = true;}else{whoDataObject[whoData[5]].isHere = false;}
-						if (whoData[6].charAt(1) == "*") {whoDataObject[whoData[5]].isGlobalOP = true;}else{whoDataObject[whoData[5]].isGlobalOP = false;}
-						if (whoData[6].charAt(2)||whoData[6].charAt(1).replace('*','')) {whoDataObject[whoData[5]].mode = botF.ircModePrefixConvert('mode', whoData[6].charAt(2)||whoData[6].charAt(1).replace('*',''));}else{whoDataObject[whoData[5]].mode = "";}
+						params = data[1][line][3].split(' ');
+						if (!parsedData[params[1]]) {parsedData[params[1]] = {};}
+						parsedData[params[1]][params[5]] = {
+							user: params[2],
+							host: params[3],
+							server: params[4],
+							isHere: params[6].charAt(0) == 'H' ? true : false,
+							isGlobalOP: params[6].charAt(1) == '*' ? true : false,
+							mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1),
+							realname: data[1][line][5]
+						};
 					}
 				}
-				ircChannelUsers[channel] = whoDataObject;
-				if(callback !== undefined) {callback(whoDataObject);}
+				for (var channel in parsedData) {
+					for (var nick in parsedData[channel]) {
+						for (var attrname in parsedData[channel][nick]) {
+							ircChannelUsers[channel][nick][attrname]=parsedData[channel][nick][attrname];
+						}
+					}
+				}
+				if(callback !== undefined) {callback(parsedData);}
 			}
 			botF.ircSendCommandWHO(channel, function (data) {ircUpdateTrackedUsersFromWhoMessage(data);});
 		},
@@ -1162,16 +1282,7 @@ botSettingsLoad(null, function (data) {
 	connections = settings.connections;
 	if(settings.terminalSupportEnabled){initTerminalHandle();}
 	if(settings.ircRelayServerEnabled){ircRelayServerInit();}
-	function handleBotEvent(connection, event) {
-		switch (event.eventName) {
-			case 'botReceivedPRIVMSG': instanceBotEventHandleObj.PRIVMSG(connection, event.eventData); break;
-			case 'botReceivedNOTICE': instanceBotEventHandleObj.NOTICE(connection, event.eventData); break;
-		}
-	}
 	for (var connection in connections) {
-		connectionsTmp[connection]=new nBot_instance(connections[connection], settings);
-		connectionsTmp[connection].init();
-		connectionsTmp[connection].botEventsEmitter.on('botEvent', handleBotEvent.bind(undefined, connection));
-		connectionsTmp[connection].botEventsEmitter.on('botDebugMessage', handleBotDebugMessageEvent.bind(undefined, connection));
+		nBotConnectionInit(connection);
 	}
 });

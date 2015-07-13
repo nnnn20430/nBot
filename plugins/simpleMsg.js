@@ -308,13 +308,14 @@ var pluginObj = {
 			if (data[1][line][2] == 352) {
 				params = data[1][line][3].split(' ');
 				if (!parsedData[params[1]]) {parsedData[params[1]] = {};}
-				parsedData[params[1]][params[2]] = {
+				parsedData[params[1]][params[5]] = {
+					user: params[2],
 					host: params[3],
 					server: params[4],
-					nick: params[5],
 					isHere: params[6].charAt(0) == 'H' ? true : false,
 					isGlobalOP: params[6].charAt(1) == '*' ? true : false,
-					mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1)
+					mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1),
+					realname: data[1][line][5]
 				};
 			}
 		}
