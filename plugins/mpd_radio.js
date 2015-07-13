@@ -27,7 +27,8 @@ var SettingsConstructor = function (modified) {
 			mpdServerPort: 6600,
 			mpdServerPassword: '',
 			mpdCommandsOpOnly: true,
-			icecastStatsUrl: 'http://localhost:8000/status-json.xsl'
+			icecastStatsUrl: 'http://localhost:8000/status-json.xsl',
+			tuneinUrl: 'http://localhost/radio/'
 		};
 		for (attrname in modified) {settings[attrname]=modified[attrname];}
 		return settings;
