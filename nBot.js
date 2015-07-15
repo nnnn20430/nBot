@@ -828,9 +828,8 @@ function nBot_instance(settings, globalSettings) {
 							ircChannelUsers[channel] = {};
 					}
 					for (var nick in parsedData[channel]) {
-						if (ircChannelUsers[channel][nick] === undefined ) {
-								ircChannelUsers[channel][nick] = {};
-						} else {
+						newChannelData[nick] = {}
+						if (ircChannelUsers[channel][nick] !== undefined ) {
 							newChannelData[nick] = ircChannelUsers[channel][nick];
 						}
 						for (var attrname in parsedData[channel][nick]) {
