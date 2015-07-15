@@ -823,11 +823,21 @@ function nBot_instance(settings, globalSettings) {
 					}
 				}
 				for (var channel in parsedData) {
+					var newChannelData = {};
+					if (ircChannelUsers[channel] === undefined ) {
+							ircChannelUsers[channel] = {};
+					}
 					for (var nick in parsedData[channel]) {
+						if (ircChannelUsers[channel][nick] === undefined ) {
+								ircChannelUsers[channel][nick] = {};
+						} else {
+							newChannelData[nick] = ircChannelUsers[channel][nick];
+						}
 						for (var attrname in parsedData[channel][nick]) {
-							ircChannelUsers[channel][nick][attrname]=parsedData[channel][nick][attrname];
+							newChannelData[nick][attrname]=parsedData[channel][nick][attrname];
 						}
 					}
+					ircChannelUsers[channel] = newChannelData;
 				}
 				if(callback !== undefined) {callback(parsedData);}
 			}
