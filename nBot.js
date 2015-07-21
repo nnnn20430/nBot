@@ -740,7 +740,8 @@ function nBot_instance(settings, globalSettings) {
 		ircSupportedUserModesArray: [
 			['o', '@'],
 			['v', '+']
-		]
+		],
+		ircNetworkServers: []
 	};
 	
 	//bot functions object
@@ -828,7 +829,7 @@ function nBot_instance(settings, globalSettings) {
 							ircChannelUsers[channel] = {};
 					}
 					for (var nick in parsedData[channel]) {
-						newChannelData[nick] = {}
+						newChannelData[nick] = {};
 						if (ircChannelUsers[channel][nick] !== undefined ) {
 							newChannelData[nick] = ircChannelUsers[channel][nick];
 						}
@@ -1007,7 +1008,8 @@ function nBot_instance(settings, globalSettings) {
 		
 		ircSendCommandJOIN: function (channel) {
 			ircConnection.write('JOIN '+channel+'\r\n');
-			botF.ircUpdateUsersInChannel(channel);
+			//should not do this before i actualy join
+			//botF.ircUpdateUsersInChannel(channel);
 		},
 		
 		ircSendCommandPART: function (channel, reason) {
@@ -1037,6 +1039,9 @@ function nBot_instance(settings, globalSettings) {
 			botF.emitBotEvent('botReceivedJOIN', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
+				botF.ircUpdateUsersInChannel(data[5]||data[3]);
+			} else {
+				//should update on bot join too ...
 				botF.ircUpdateUsersInChannel(data[5]||data[3]);
 			}
 		},
@@ -1157,6 +1162,20 @@ function nBot_instance(settings, globalSettings) {
 			botF.emitBotEvent('botReceivedNum353', data);
 		},
 		
+		ircReceiveNumHandle364: function (data) {//RPL_LINKS
+			botF.emitBotEvent('botReceivedNum364', data);
+			botV.ircNetworkServers = [];
+			var parsedData, line, params;
+			for (line in data[1]) {
+				botV.ircNetworkServers[line] = {};
+				params = data[1][line][3].split(' ');
+				botV.ircNetworkServers[line].mask = params[1];
+				botV.ircNetworkServers[line].server = params[2];
+				botV.ircNetworkServers[line].hop = (params[3].charAt(0) == ':' ? params[3].substr(1) : params[3]);
+				botV.ircNetworkServers[line].info = params[4];
+			}
+		},
+		
 		//main irc data receiving function
 		ircDataReceiveHandle: function (data) {
 			botF.emitBotEvent('botReceivedDataRAW', data);
@@ -1173,7 +1192,8 @@ function nBot_instance(settings, globalSettings) {
 					'005': {endNumeric: '005', messageHandle: botF.ircReceiveNumHandle005},
 					'311': {endNumeric: '318', messageHandle: botF.ircReceiveNumHandle311},
 					'352': {endNumeric: '315', messageHandle: botF.ircReceiveNumHandle352},
-					'353': {endNumeric: '366', messageHandle: botF.ircReceiveNumHandle353}
+					'353': {endNumeric: '366', messageHandle: botF.ircReceiveNumHandle353},
+					'364': {endNumeric: '365', messageHandle: botF.ircReceiveNumHandle364}
 				};
 				
 				if (botV.ircUnfinishedMultilineMessage !== undefined) {

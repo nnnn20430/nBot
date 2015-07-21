@@ -47,6 +47,7 @@ var pluginObj = {
 	//variables
 	authenticatedOpUsers: [],
 	commandsOriginObj: {},
+	netsplitData: [[false, false], {}, {}],
 	
 	//misc plugin functions
 	
@@ -387,6 +388,7 @@ module.exports.plugin = pluginObj;
 //handle "botEvent" from bot (botEvent is used for irc related activity)
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
+		//make sure operator list is clean if new connection is made
 		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveCommands) {pluginObj.commandsRemoveByOrigin(event.eventData);} break;
 	}
 };
@@ -423,8 +425,27 @@ module.exports.main = function (passedData) {
 	simpleMsg.msgListenerAdd(pluginId, 'JOIN', function (data) {
 		if (data.nick != settings.botName){
 			if (pluginSettings.reactToJoinPart === true) {
-				botF.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
-				if (data.nick == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
+				var isNetsplit = false;
+				if (Object.keys(pluginObj.netsplitData[1]).length) {
+					if (pluginObj.netsplitData[1][data.nick]) {
+						isNetsplit = true;
+						delete pluginObj.netsplitData[1][data.nick];
+						if (pluginObj.netsplitData[0][1]) {
+							clearTimeout(pluginObj.netsplitData[0][1]);
+						}
+						pluginObj.netsplitData[0][1] = setTimeout(function () {
+							pluginObj.netsplitData[0][1] = false;
+							for (var channel in pluginObj.netsplitData[2]) {
+								botF.ircSendCommandPRIVMSG('Netsplit over!', channel);
+							}
+							pluginObj.netsplitData[2] = {};
+						}, 2000);
+					}
+				}
+				if (!isNetsplit) {
+					botF.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
+					if (data.nick == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
+				}
 			}
 		}
 	});
@@ -444,9 +465,32 @@ module.exports.main = function (passedData) {
 	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
 		if (data.nick != settings.botName){
 			if(pluginObj.isOp(data.nick)){pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);}
-			for (var channel in data.channels) {
-				if (pluginSettings.reactToJoinPart === true) {
-					botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
+			if (pluginSettings.reactToJoinPart === true) {
+				//detect netsplits
+				var isNetsplit = false;
+				for (var server in botV.ircNetworkServers) {
+					if (data.reason.split(' ')[0] == botV.ircNetworkServers[server].mask) {
+						isNetsplit = true;
+					}
+				}
+				if (isNetsplit) {
+					if (pluginObj.netsplitData[0][0]) {
+						clearTimeout(pluginObj.netsplitData[0][0]);
+					}
+					pluginObj.netsplitData[0][0] = setTimeout(function () {
+						pluginObj.netsplitData[0][0] = false;
+						for (var channel in pluginObj.netsplitData[2]) {
+							botF.ircSendCommandPRIVMSG('Netsplit: '+data.reason.split(' ')[0]+'<=>'+data.reason.split(' ')[1]+'.', channel);
+						}
+					}, 2000);
+					pluginObj.netsplitData[1][data.nick] = true;
+					for (var channelS in data.channels) {
+						pluginObj.netsplitData[2][data.channels[channelS]] = true;
+					}
+				} else {
+					for (var channel in data.channels) {
+						botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
+					}
 				}
 			}
 		}
