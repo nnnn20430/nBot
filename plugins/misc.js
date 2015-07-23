@@ -82,10 +82,14 @@ var pluginObj = {
 		var secMinute = 1 * 60;
 		var secHour = secMinute * 60;
 		var secDay = secHour * 24;
-		var secYear = secDay * 365;
+		var secWeek = secDay * 7;
+		var secYear = secWeek * 52;
 		
 		var years = Math.floor(seconds / secYear);
 		seconds = seconds - (years * secYear);
+		
+		var weeks = Math.floor(seconds / secWeek);
+		seconds = seconds - (weeks * secWeek);
 		
 		var days = Math.floor(seconds / secDay);
 		seconds = seconds - (days * secDay);
@@ -96,7 +100,19 @@ var pluginObj = {
 		var minutes = Math.floor(seconds / secMinute);
 		seconds = seconds - (minutes * secMinute);
 		
-		return [years, days, hours, minutes, seconds];
+		return [years, weeks, days, hours, minutes, seconds];
+	},
+	
+	//convert output of parseSeconds() to string
+	parsedSecondsToString: function (a) {
+		var string = '';
+		string += a[0] > 0 ? ' '+a[0]+'y' : '';
+		string += a[1] > 0 ? ' '+a[1]+'w' : '';
+		string += a[2] > 0 ? ' '+a[2]+'d' : '';
+		string += a[3] > 0 ? ' '+a[3]+'h' : '';
+		string += a[4] > 0 ? ' '+a[4]+'m' : '';
+		string += a[5] > 0 ? ' '+a[5]+'s' : '';
+		return string.substr(1);
 	},
 	
 	//parse years, days, hours, minutes, seconds to seconds
@@ -106,10 +122,14 @@ var pluginObj = {
 		var secMinute = 1 * 60;
 		var secHour = secMinute * 60;
 		var secDay = secHour * 24;
-		var secYear = secDay * 365;
+		var secWeek = secDay * 7;
+		var secYear = secWeek * 52;
 		
 		if((match = string.match('([0-9]+)y')) !== null) {
 			seconds += +match[1]*secYear;
+		}
+		if((match = string.match('([0-9]+)w')) !== null) {
+			seconds += +match[1]*secWeek;
 		}
 		if((match = string.match('([0-9]+)d')) !== null) {
 			seconds += +match[1]*secDay;
@@ -146,8 +166,7 @@ var pluginObj = {
 					nextbday.setFullYear(new Date().getFullYear()+1);
 					nextbday = Math.round(nextbday.getTime()/1000);
 				}
-				nextbdayString = pluginObj.parseSeconds(nextbday-date);
-				nextbdayString = (nextbdayString[1]+(nextbdayString[0]*365))+'d '+nextbdayString[2]+'h '+nextbdayString[3]+'m '+nextbdayString[4]+'s';
+				nextbdayString = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(nextbday-date));
 				if ((bday.getMonth() === new Date().getMonth()) && (bday.getDate() == new Date().getDate())) {
 					bdayIsToday = true;
 				}
@@ -190,8 +209,7 @@ var pluginObj = {
 				bdaySec = +pluginSettings.birthdayData[user];
 				bday = new Date(); bday.setTime(bdaySec*1000);
 				bdayLeap=Math.round(bday.getTime()/1000)+pluginObj.parseTimeToSeconds(pluginObj.leapYearRange(bday.getFullYear(), new Date().getFullYear()).splice(1).length+'d');
-				age = pluginObj.parseSeconds(date-bdayLeap);
-				age = age[0]+'y '+age[1]+'d '+age[2]+'h '+age[3]+'m '+age[4]+'s';
+				age = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(date-bdayLeap));
 				botF.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 			}
 		}, 'age "user": known users age', pluginId);
@@ -620,7 +638,7 @@ module.exports.main = function (passedData) {
 	var commandsPlugin = botObj.pluginData.commands.plugin;
 	commandsPlugin.commandAdd('parseseconds', function (data) {
 		var parsedTime = pluginObj.parseSeconds(data.messageARGS[1]);
-		botF.ircSendCommandPRIVMSG(parsedTime[0]+'y '+parsedTime[1]+'d '+parsedTime[2]+'h '+parsedTime[3]+'m '+parsedTime[4]+'s', data.responseTarget);
+		botF.ircSendCommandPRIVMSG(pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
 	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
 	
 	commandsPlugin.commandAdd('parsetime', function (data) {
@@ -668,7 +686,7 @@ module.exports.main = function (passedData) {
 			case 'SHOW':
 				parsedTime = pluginObj.parseSeconds(pluginObj.countdownDataObj[data.messageARGS[2]][1]-date);
 				console.log(pluginObj.countdownDataObj[data.messageARGS[2]][1]+' '+date);
-				botF.ircSendCommandPRIVMSG('Time left: '+parsedTime[0]+'y '+parsedTime[1]+'d '+parsedTime[2]+'h '+parsedTime[3]+'m '+parsedTime[4]+'s', data.responseTarget);
+				botF.ircSendCommandPRIVMSG('Time left: '+pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
 				break;
 		}
 	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
@@ -685,6 +703,6 @@ module.exports.main = function (passedData) {
 	
 	commandsPlugin.commandAdd('uptime', function (data) {
 		var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
-		botF.ircSendCommandPRIVMSG('Uptime: '+upTime[0]+'y '+upTime[1]+'d '+upTime[2]+'h '+upTime[3]+'m '+upTime[4]+'s', data.responseTarget);
+		botF.ircSendCommandPRIVMSG('Uptime: '+pluginObj.parsedSecondsToString(upTime), data.responseTarget);
 	}, 'uptime: print time passed since nBot process was started', pluginId);
 };

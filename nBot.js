@@ -58,7 +58,8 @@ var SettingsConstructor = {
 				pluginDir: './plugins',
 				plugins: [ 
 					'simpleMsg',
-					'commands'
+					'commands',
+					'connectionErrorResolver'
 				],
 				pluginsSettings: {}
 			};
@@ -818,7 +819,7 @@ function nBot_instance(settings, globalSettings) {
 							server: params[4],
 							isHere: params[6].charAt(0) == 'H' ? true : false,
 							isGlobalOP: params[6].charAt(1) == '*' ? true : false,
-							mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1),
+							mode: botF.ircModePrefixConvert('mode', (params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1))),
 							realname: data[1][line][5]
 						};
 					}
@@ -851,6 +852,7 @@ function nBot_instance(settings, globalSettings) {
 			botF.ircSendCommandWHOIS(settings.botName, function (data) {botF.ircJoinMissingChannels(data);});
 			ircIntervalUpdate = setInterval(function () {botF.ircSendCommandWHOIS(settings.botName, function (data, lineArray) {botF.ircJoinMissingChannels(data, lineArray);});}, 10000);
 			nBotObject.ircConnection.once('close', function() {clearInterval(ircIntervalUpdate);});
+			botF.ircWriteData('LINKS');
 		},
 		
 		//misc bot functions: emit debug message event
@@ -1071,18 +1073,29 @@ function nBot_instance(settings, globalSettings) {
 		ircReceiveHandleMODE: function (data) {
 			botF.emitBotEvent('botReceivedMODE', data);
 			var modeParams = data[3].split(' ');
-			if (modeParams.length == 3) {
-				if(modeParams[0].charAt(0) == '#' && (modeParams[1].charAt(0) == '+' || modeParams[1].charAt(0) == '-')){
-					if (ircChannelUsers[modeParams[0]] && ircChannelUsers[modeParams[0]][modeParams[2]]) {
-						if (modeParams[1].charAt(0) == '+') {
-							ircChannelUsers[modeParams[0]][modeParams[2]].mode += modeParams[1].substr(1);
-						}
-						if (modeParams[1].charAt(0) == '-') {
-							var removedModes = modeParams[1].substr(1).split('');
-							for (var mode in removedModes) {
-								ircChannelUsers[modeParams[0]][modeParams[2]].mode = ircChannelUsers[modeParams[0]][modeParams[2]].mode.split(removedModes[mode]).join('');
-							}
-						}
+			
+			if (modeParams[0].charAt(0) == '#') {
+				var channel = modeParams[0];
+				var modes = modeParams[1].split(/(\-|\+)/g);
+				var modeparams = modeParams.slice(2);
+				var mode, oModes, user;
+				
+				for (var operation in modes) {
+					switch (modes[operation]) {
+						case '+':
+							oModes = modes[+operation+1].split('');
+							for (mode in oModes) {
+								user = modeparams.splice(0, 1);
+								ircChannelUsers[channel][user].mode += botF.ircModePrefixConvert('mode', oModes[mode]);
+							}	
+							break;
+						case '-':
+							oModes = modes[+operation+1].split('');
+							for (mode in oModes) {
+								user = modeparams.splice(0, 1);
+								ircChannelUsers[channel][user].mode = ircChannelUsers[channel][user].mode.split(botF.ircModePrefixConvert('mode', oModes[mode])).join('');
+							}	
+							break;
 					}
 				}
 			}
@@ -1172,7 +1185,7 @@ function nBot_instance(settings, globalSettings) {
 				botV.ircNetworkServers[line].mask = params[1];
 				botV.ircNetworkServers[line].server = params[2];
 				botV.ircNetworkServers[line].hop = (params[3].charAt(0) == ':' ? params[3].substr(1) : params[3]);
-				botV.ircNetworkServers[line].info = params[4];
+				botV.ircNetworkServers[line].info = data[1][line][5].split(' ').slice(1).join(' ');
 			}
 		},
 		
