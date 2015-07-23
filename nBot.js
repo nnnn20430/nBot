@@ -33,6 +33,7 @@ var SettingsConstructor = {
 		if (this!==SettingsConstructor) {
 			mainSettings = {
 				terminalSupportEnabled: true,
+				terminalInputPrefix: '>',
 				ircRelayServerEnabled: true,
 				ircRelayServerPort: 9977,
 				debugMessages: false
