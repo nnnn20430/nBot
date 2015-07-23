@@ -114,25 +114,28 @@ function terminalLog(data) {
 }
 
 function terminalUpdateBuffer(){
+	var tColumns = (+process.stdout.columns-settings.terminalInputPrefix.length);
 	process.stdout.write("\x1b[1G\x1b[2K");
-	process.stdout.write(terminalBuffer[terminalBufferCurrent].substr(terminalGetCursorPos()[1], process.stdout.columns));
-	process.stdout.write("\x1b["+terminalGetCursorPos()[0]+"G");
+	process.stdout.write(settings.terminalInputPrefix);
+	process.stdout.write(terminalBuffer[terminalBufferCurrent].substr(terminalGetCursorPos()[1], tColumns));
+	process.stdout.write("\x1b["+(+terminalGetCursorPos()[0])+"G");
 }
 
 function terminalGetCursorPos(){
+	var tColumns = (+process.stdout.columns-settings.terminalInputPrefix.length);
 	var positionAbsolute = terminalCursorPositionAbsolute-1;
-	var offsetCount = Math.floor(positionAbsolute/process.stdout.columns);
-	var adjustedOffsetCount = Math.floor((positionAbsolute+offsetCount)/process.stdout.columns);
-	var offsetRemainder = (positionAbsolute+adjustedOffsetCount)%process.stdout.columns;
-	var postionOffset = adjustedOffsetCount*process.stdout.columns-adjustedOffsetCount;
-	offsetRemainder+=1;
+	var offsetCount = Math.floor(positionAbsolute/tColumns);
+	var adjustedOffsetCount = Math.floor((positionAbsolute+offsetCount)/tColumns);
+	var offsetRemainder = (positionAbsolute+adjustedOffsetCount)%tColumns;
+	var postionOffset = adjustedOffsetCount*tColumns-adjustedOffsetCount;
+	offsetRemainder+=(1+settings.terminalInputPrefix.length);
 	return [offsetRemainder, postionOffset];
 }
 
 function terminalProcessInput(chunk) {
 	var terminalCommandArgs = getArgsFromString(chunk)[0];
 	var connectionName = connections[terminalCurrentConnection].connectionName||terminalCurrentConnection;
-	if (terminalCommandArgs[0].charAt(0) == '/') {
+	if (terminalCommandArgs[0] && terminalCommandArgs[0].charAt(0) == '/') {
 		switch (terminalCommandArgs[0].split('').slice(1).join('')) {
 			case 'raw':
 				(function () {
@@ -347,7 +350,7 @@ function terminalProcessInput(chunk) {
 				break;
 		}
 	}
-	if (chunk.charAt(0) != '/') {
+	if (chunk && chunk.charAt(0) != '/') {
 		terminalLog('['+connectionName+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
 		connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
 	}
@@ -366,20 +369,22 @@ function initTerminalHandle() {
 		if (chunk !== null) {
 			if (chunk == "\x0d") {
 				//enter
-				process.stdout.write('\x0a');
-				var BufferData = terminalBuffer[terminalBufferCurrent];
-				if (terminalBuffer[terminalBufferCurrent] !== "") {
-					terminalBuffer.splice(1, 0, terminalBuffer[terminalBufferCurrent]);
-					if (terminalBufferCurrent > 0) {
-						terminalBuffer[terminalBufferCurrent+1]=terminalBufferCurrentUnModifiedState;
+				if (terminalBuffer[terminalBufferCurrent]) {
+					process.stdout.write('\x0a');
+					var BufferData = terminalBuffer[terminalBufferCurrent];
+					if (terminalBuffer[terminalBufferCurrent] !== "") {
+						terminalBuffer.splice(1, 0, terminalBuffer[terminalBufferCurrent]);
+						if (terminalBufferCurrent > 0) {
+							terminalBuffer[terminalBufferCurrent+1]=terminalBufferCurrentUnModifiedState;
+						}
+						terminalBuffer.splice((terminalBufferMax+1), 1);
 					}
-					terminalBuffer.splice((terminalBufferMax+1), 1);
+					terminalBufferCurrent=0;
+					terminalBuffer[0]="";
+					terminalCursorPositionAbsolute=1;
+					terminalUpdateBuffer();
+					terminalProcessInput(BufferData);
 				}
-				terminalBufferCurrent=0;
-				terminalBuffer[0]="";
-				terminalCursorPositionAbsolute=1;
-				terminalUpdateBuffer();
-				terminalProcessInput(BufferData);
 			}else if (chunk == "\x7f") {
 				//backspace
 				terminalBuffer[terminalBufferCurrent]=terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-2))+terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
@@ -1086,14 +1091,18 @@ function nBot_instance(settings, globalSettings) {
 							oModes = modes[+operation+1].split('');
 							for (mode in oModes) {
 								user = modeparams.splice(0, 1);
-								ircChannelUsers[channel][user].mode += botF.ircModePrefixConvert('mode', oModes[mode]);
+								if (ircChannelUsers[channel] && ircChannelUsers[channel][user]) {
+									ircChannelUsers[channel][user].mode += botF.ircModePrefixConvert('mode', oModes[mode]);
+								}
 							}	
 							break;
 						case '-':
 							oModes = modes[+operation+1].split('');
 							for (mode in oModes) {
 								user = modeparams.splice(0, 1);
-								ircChannelUsers[channel][user].mode = ircChannelUsers[channel][user].mode.split(botF.ircModePrefixConvert('mode', oModes[mode])).join('');
+								if (ircChannelUsers[channel] && ircChannelUsers[channel][user]) {
+									ircChannelUsers[channel][user].mode = ircChannelUsers[channel][user].mode.split(botF.ircModePrefixConvert('mode', oModes[mode])).join('');
+								}
 							}	
 							break;
 					}
