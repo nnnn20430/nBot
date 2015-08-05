@@ -170,7 +170,7 @@ function terminalProcessInput(chunk) {
 			case 'quit':
 				(function () {
 					var quitReason = terminalCommandArgs[1]||"Leaving";
-					terminalLog('quitting...');
+					terminalLog('> quitting...');
 					setTimeout(function () {killAllnBotInstances(null, true);process.exit();}, 1000);
 					killAllnBotInstances(quitReason);
 				})();
@@ -280,7 +280,7 @@ function terminalProcessInput(chunk) {
 			case 'savesettings':
 				(function () {
 					botSettingsSave(null, null, function () {
-						terminalLog('Settings saved!');
+						terminalLog('> Settings saved!');
 					});
 				})();
 				break;
@@ -301,7 +301,7 @@ function terminalProcessInput(chunk) {
 								pluginReload(botObj, plugin);
 							}
 						}
-						terminalLog('Settings loaded!');
+						terminalLog('> Settings loaded!');
 					});
 				})();
 				break;
@@ -313,9 +313,9 @@ function terminalProcessInput(chunk) {
 						})
 					);
 					botSettingsSave(null, null, function () {
-						terminalLog('Connection created and written to settings');
-						terminalLog('modify the connection then load the changes using /loadsettings');
-						terminalLog('then initialize the connection using /connectioninit');
+						terminalLog('> Connection created and written to settings');
+						terminalLog('> modify the connection and load the changes using /loadsettings');
+						terminalLog('> then initialize the connection using /connectioninit');
 					});
 				})();
 				break;
@@ -326,8 +326,8 @@ function terminalProcessInput(chunk) {
 						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
 					}
 					connections.splice(connectionId, 1);
-					terminalLog('Connection deleted');
-					terminalLog('confirm this by saving settings using /savesettings');
+					terminalLog('> Connection deleted');
+					terminalLog('> confirm this by saving settings using /savesettings');
 
 				})();
 				break;

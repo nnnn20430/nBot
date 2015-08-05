@@ -158,13 +158,10 @@ var pluginObj = {
 			if (pluginSettings.birthdayData[user]) {
 				bdaySec = +pluginSettings.birthdayData[user];
 				bday = new Date(); bday.setTime(bdaySec*1000);
-				nextbday = new Date(bday);
-				nextbday.setFullYear(new Date().getFullYear());
-				if (Math.round(nextbday.getTime()/1000) > date) {
-					nextbday = Math.round(nextbday.getTime()/1000);
+				if (Math.round(new Date(bday).setFullYear(new Date().getFullYear())/1000) > date) {
+					nextbday = Math.round(new Date(bday).setFullYear(new Date().getFullYear())/1000);
 				} else {
-					nextbday.setFullYear(new Date().getFullYear()+1);
-					nextbday = Math.round(nextbday.getTime()/1000);
+					nextbday = Math.round(new Date(bday).setFullYear(new Date().getFullYear()+1)/1000);
 				}
 				nextbdayString = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(nextbday-date));
 				if ((bday.getMonth() === new Date().getMonth()) && (bday.getDate() == new Date().getDate())) {
@@ -203,13 +200,11 @@ var pluginObj = {
 		
 		commandsPlugin.commandAdd('age', function (data) {
 			var user = data.messageARGS[1];
-			var bdaySec, bday, age, bdayLeap;
-			var date = Math.round(new Date().getTime()/1000);
+			var bdaySec, bday, age;
+			var dateSec = Math.round(new Date().getTime()/1000);
 			if (pluginSettings.birthdayData[user]) {
 				bdaySec = +pluginSettings.birthdayData[user];
-				bday = new Date(); bday.setTime(bdaySec*1000);
-				bdayLeap=Math.round(bday.getTime()/1000)+pluginObj.parseTimeToSeconds(pluginObj.leapYearRange(bday.getFullYear(), new Date().getFullYear()).splice(1).length+'d');
-				age = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(date-bdayLeap));
+				age = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(dateSec-bdaySec));
 				botF.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 			}
 		}, 'age "user": known users age', pluginId);
