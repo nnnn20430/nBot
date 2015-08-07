@@ -337,6 +337,15 @@ function terminalProcessInput(chunk) {
 					for (var connection in connections) {
 						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
 					}
+					if (connectionsTmp[connectionId]) {
+						var botObj = connectionsTmp[connectionId];
+						var botF = botObj.publicData.botFunctions;
+						for (var plugin in botObj.pluginData) {
+							botF.botPluginDisable(plugin);
+						}
+						connectionsTmp[connectionId].kill();
+						connectionsTmp[connectionId] = null;
+					}
 					nBotConnectionInit(connectionId);
 				})();
 				break;
@@ -346,7 +355,15 @@ function terminalProcessInput(chunk) {
 					for (var connection in connections) {
 						if (connections[connection].connectionName == connectionId) {connectionId = connection;}
 					}
-					connectionsTmp[connectionId].kill();
+					if (connectionsTmp[connectionId]) {
+						var botObj = connectionsTmp[connectionId];
+						var botF = botObj.publicData.botFunctions;
+						for (var plugin in botObj.pluginData) {
+							botF.botPluginDisable(plugin);
+						}
+						connectionsTmp[connectionId].kill();
+						connectionsTmp[connectionId] = null;
+					}
 				})();
 				break;
 		}
@@ -899,6 +916,10 @@ function nBot_instance(settings, globalSettings) {
 			}
 			(function () {
 				try {
+					if (nBotObject.pluginData[id]) {
+						botF.debugMsg('Plugin "'+id+'" is already registered, trying to disable before attempting to load...');
+						botF.botPluginDisable(id);
+					}
 					nBotObject.pluginData[id] = require(pluginPath);
 					nBotObject.pluginData[id].main({id: id, botObj: nBotObject});
 					if (nBotObject.pluginData[id].botEvent) {
