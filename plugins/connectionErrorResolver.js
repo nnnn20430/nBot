@@ -44,7 +44,9 @@ var pluginObj = {
 		});
 		ircConnection.once('close', function() {
 			if (!pluginDisabled) {
-				setTimeout(function() {botF.initIrcBot();}, 3000);
+				setTimeout(function() {
+					if (!pluginDisabled) {botF.initIrcBot();}
+				}, 3000);
 			}
 		});
 	},

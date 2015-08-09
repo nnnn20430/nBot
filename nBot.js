@@ -52,6 +52,8 @@ var SettingsConstructor = {
 				ircServer: 'localhost',
 				ircServerPort: 6667,
 				ircServerPassword: '',
+				socks5_host: '',
+				socks5_port: 1080,
 				channels: [ '#channel' ],
 				ircRelayServerEnabled: true,
 				ircMaxCommandResponseWaitQueue: 30,
@@ -380,6 +382,7 @@ function initTerminalHandle() {
 
 	process.stdin.setEncoding('utf8');
 	process.stdin.setRawMode(true);
+	terminalUpdateBuffer();
 	
 	process.stdin.on('readable', function() {
 		var chunk = process.stdin.read();
@@ -560,6 +563,58 @@ function encode_utf8(s) {
 function decode_utf8(s) {
 	var escape;
 	return decodeURIComponent(escape(s));
+}
+
+//https://gist.github.com/Mottie/7018157
+function expandIPv6Address(address) {
+    var fullAddress = "";
+    var expandedAddress = "";
+    var validGroupCount = 8;
+    var validGroupSize = 4;
+    var i;
+
+    var ipv4 = "";
+    var extractIpv4 = /([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/;
+    var validateIpv4 = /((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})/;
+
+    // look for embedded ipv4
+    if(validateIpv4.test(address))
+    {
+        groups = address.match(extractIpv4);
+        for(i=1; i<groups.length; i++)
+        {
+            ipv4 += ("00" + (parseInt(groups[i], 10).toString(16)) ).slice(-2) + ( i==2 ? ":" : "" );
+        }
+        address = address.replace(extractIpv4, ipv4);
+    }
+
+    if(address.indexOf("::") == -1) // All eight groups are present.
+        fullAddress = address;
+    else // Consecutive groups of zeroes have been collapsed with "::".
+    {
+        var sides = address.split("::");
+        var groupsPresent = 0;
+        for(i=0; i<sides.length; i++)
+        {
+            groupsPresent += sides[i].split(":").length;
+        }
+        fullAddress += sides[0] + ":";
+        for(i=0; i<validGroupCount-groupsPresent; i++)
+        {
+            fullAddress += "0000:";
+        }
+        fullAddress += sides[1];
+    }
+    var groups = fullAddress.split(":");
+    for(i=0; i<validGroupCount; i++)
+    {
+        while(groups[i].length < validGroupSize)
+        {
+            groups[i] = "0" + groups[i];
+        }
+        expandedAddress += (i!=validGroupCount-1) ? groups[i] + ":" : groups[i];
+    }
+    return expandedAddress;
 }
 
 //misc functions
@@ -1311,16 +1366,81 @@ function nBot_instance(settings, globalSettings) {
 					}
 				}
 			}
-			ircConnection = net.connect({port: connectionInfo.port, host: connectionInfo.host},
-				function() { //'connect' listener
+			function connect() {
+				var connectionOptions = {
+					host: connectionInfo.host,
+					port: connectionInfo.port
+				};
+				var socks5 = false;
+				function initSocks(host, port, callback) {
+					var ipAdr;
+					var octet;
+					var ATYP = net.isIP(host);
+					var DST_ADDR = '';
+					var DST_PORT = ('000'+(+port).toString(16)).slice(-4);
+					switch (ATYP) {
+						case 0:
+							ATYP = '03';
+							DST_ADDR += ('0'+host.length.toString(16)).slice(-2);
+							DST_ADDR += host.toHex();
+							break;
+						case 4:
+							ATYP = '01';
+							ipAdr = host.split('.');
+							for (octet in ipAdr) {
+								DST_ADDR += ('0'+(ipAdr[octet]).toString(16)).slice(-2);
+							}
+							break;
+						case 6:
+							ATYP = '04';
+							ipAdr = expandIPv6Address(host).split(':');
+							for (octet in ipAdr) {
+								DST_ADDR += ipAdr[octet];
+							}
+							break;
+					}
+					ircConnection.setEncoding('hex');
+					//socks5(05), one method(01), NO AUTHENTICATION(00)
+					ircConnection.write(new Buffer('050100', 'hex'));
+					ircConnection.once('data', function (data) {
+						//if chosen method == NO AUTHENTICATION(00)
+						if (data == '0500') {
+							ircConnection.write(new Buffer('050100'+ATYP+DST_ADDR+DST_PORT, 'hex'));
+							ircConnection.once('data', function (data) {
+								//00 == succeeded
+								if (data.substr(2*1, 2) == '00') {
+									callback();
+								} else {
+									botF.debugMsg('Error: Proxy traversal failed');
+								}
+							});
+						}
+					});
+				}
+				function initIrc() {
 					ircConnection.setEncoding('utf8');
 					ircConnection.on('data', ircConnectionOnData);
 					if (settings.ircServerPassword) {ircConnection.write('PASS '+settings.ircServerPassword+'\r\n');}
 					ircConnection.write('NICK '+connectionInfo.nick+'\r\n');
 					ircConnection.write('USER '+connectionInfo.nick+' '+connectionInfo.mode+' '+connectionInfo.host+' :'+connectionInfo.nick+'\r\n');
-			});
-			nBotObject.ircConnection=ircConnection;
-			botF.emitBotEvent('botIrcConnectionCreated', ircConnection);
+				}
+				if (settings.socks5_host && settings.socks5_port) {
+					socks5 = true;
+					connectionOptions.host = settings.socks5_host;
+					connectionOptions.port = settings.socks5_port;
+				}
+				ircConnection = net.connect(connectionOptions,
+					function() { //'connect' listener
+						if (socks5) {
+							initSocks(connectionInfo.host, connectionInfo.port, initIrc);
+						} else {
+							initIrc();
+						}
+				});
+				nBotObject.ircConnection=ircConnection;
+				botF.emitBotEvent('botIrcConnectionCreated', ircConnection);
+			}
+			connect();
 		}
 	};
 	
