@@ -144,7 +144,12 @@ function terminalProcessInput(chunk) {
 		switch (terminalCommandArgs[0].split('').slice(1).join('')) {
 			case 'raw':
 				(function () {
-					connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');
+					if (connectionsTmp[terminalCurrentConnection] &&
+					!connectionsTmp[terminalCurrentConnection].ircConnection.destroyed) {
+						connectionsTmp[terminalCurrentConnection].ircConnection.write(terminalCommandArgs[1]+'\r\n');
+					} else {
+						terminalLog('Current connection is dead.');
+					}
 				})();
 				break;
 			case 'join':
@@ -159,14 +164,22 @@ function terminalProcessInput(chunk) {
 					var partReason = "Leaving";
 					if (terminalCommandArgs[2] !== undefined) {partReason=terminalCommandArgs[2];}
 					connections[terminalCurrentConnection].channels.arrayValueRemove(terminalCommandArgs[1]);
-					connectionsTmp[terminalCurrentConnection].ircConnection.write('PART '+terminalCommandArgs[1]+' :'+partReason+'\r\n');
+					if (connectionsTmp[terminalCurrentConnection] &&
+					!connectionsTmp[terminalCurrentConnection].ircConnection.destroyed) {
+						connectionsTmp[terminalCurrentConnection].ircConnection.write('PART '+terminalCommandArgs[1]+' :'+partReason+'\r\n');
+					}
 				})();
 				break;
 			case 'say':
 				(function () {
 					if (terminalCommandArgs[2] !== undefined) {
-						terminalLog('['+connectionName+':'+terminalCommandArgs[1]+'] '+connections[terminalCurrentConnection].botName+': '+terminalCommandArgs[2]);
-						connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalCommandArgs[1]+' :'+terminalCommandArgs[2]+'\r\n');
+						if (connectionsTmp[terminalCurrentConnection] &&
+						!connectionsTmp[terminalCurrentConnection].ircConnection.destroyed) {
+							terminalLog('['+connectionName+':'+terminalCommandArgs[1]+'] '+connections[terminalCurrentConnection].botName+': '+terminalCommandArgs[2]);
+							connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalCommandArgs[1]+' :'+terminalCommandArgs[2]+'\r\n');
+						} else {
+							terminalLog('Current connection is dead');
+						}
 					}
 					terminalLastChannel = terminalCommandArgs[1];
 				})();
@@ -193,19 +206,22 @@ function terminalProcessInput(chunk) {
 							}
 						}
 						if (terminalCommandArgs[1].toUpperCase() == 'LIST') {
-							terminalLog('> Connection list:');
 							for (connection in connections) {
-								terminalLog('> id: '+connection+', name: '+connections[connection].connectionName);
+								terminalLog('> id: '+connection+', name: "'+connections[connection].connectionName+'", status: '+(connectionsTmp[connection]?(connectionsTmp[connection].ircConnection.destroyed?'dead':'alive'):'dead'));
 							}
 						}
 					} else {
-						terminalLog('> Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'".');
+						terminalLog('> Current connection id: '+terminalCurrentConnection+', name: "'+connections[terminalCurrentConnection].connectionName+'", status: '+(connectionsTmp[terminalCurrentConnection]?(connectionsTmp[terminalCurrentConnection].ircConnection.destroyed?'dead':'alive'):'dead')+'.');
 					}
 				})();
 				break;
 			case 'fakemsg':
 				(function () {
-					connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
+					if (connectionsTmp[terminalCurrentConnection]) {
+						connectionsTmp[terminalCurrentConnection].publicData.botFunctions.emitBotEvent('botReceivedPRIVMSG', ['terminal', 'terminal', 'terminal', 'terminal', 'terminal', terminalCommandArgs[1]]);
+					} else {
+						terminalLog('Current connection is dead.');
+					}
 				})();
 				break;
 			case 'evaljs':
@@ -240,45 +256,61 @@ function terminalProcessInput(chunk) {
 				break;
 			case 'pluginreload':
 				(function () {
-					var botObj = connectionsTmp[terminalCurrentConnection];
-					var botF = botObj.publicData.botFunctions;
-					var settings = botObj.publicData.settings;
-					if (botObj.pluginData[terminalCommandArgs[1]]) {
-						botF.botPluginDisable(terminalCommandArgs[1]);
-						botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
+					if (connectionsTmp[terminalCurrentConnection]) {
+						var botObj = connectionsTmp[terminalCurrentConnection];
+						var botF = botObj.publicData.botFunctions;
+						var settings = botObj.publicData.settings;
+						if (botObj.pluginData[terminalCommandArgs[1]]) {
+							botF.botPluginDisable(terminalCommandArgs[1]);
+							botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
+						}
+					} else {
+						terminalLog('Current connection is dead.');
 					}
 				})();
 				break;
 			case 'pluginreloadall':
 				(function () {
-					var botObj = connectionsTmp[terminalCurrentConnection];
-					var botF = botObj.publicData.botFunctions;
-					var settings = botObj.publicData.settings;
 					function pluginReload(plugin) {
 						botF.botPluginDisable(plugin);
 						botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
 					}
-					for (var plugin in botObj.pluginData) {
-						pluginReload(plugin);
+					if (connectionsTmp[terminalCurrentConnection]) {
+						var botObj = connectionsTmp[terminalCurrentConnection];
+						var botF = botObj.publicData.botFunctions;
+						var settings = botObj.publicData.settings;
+						for (var plugin in botObj.pluginData) {
+							pluginReload(plugin);
+						}
+					} else {
+						terminalLog('Current connection is dead.');
 					}
 				})();
 				break;
 			case 'pluginload':
 				(function () {
-					var botObj = connectionsTmp[terminalCurrentConnection];
-					var botF = botObj.publicData.botFunctions;
-					var settings = botObj.publicData.settings;
-					botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
-					settings.plugins.arrayValueAdd(terminalCommandArgs[1]);
+					if (connectionsTmp[terminalCurrentConnection]) {
+						var botObj = connectionsTmp[terminalCurrentConnection];
+						var botF = botObj.publicData.botFunctions;
+						var settings = botObj.publicData.settings;
+						botF.botPluginLoad(terminalCommandArgs[1], settings.pluginDir+'/'+terminalCommandArgs[1]+'.js');
+						settings.plugins.arrayValueAdd(terminalCommandArgs[1]);
+					} else {
+						terminalLog('Current connection is dead.');
+					}
 				})();
 				break;
 			case 'plugindisable':
 				(function () {
-					var botObj = connectionsTmp[terminalCurrentConnection];
-					var botF = botObj.publicData.botFunctions;
-					var settings = botObj.publicData.settings;
-					botF.botPluginDisable(terminalCommandArgs[1]);
-					settings.plugins.arrayValueRemove(terminalCommandArgs[1]);
+					if (connectionsTmp[terminalCurrentConnection]) {
+						var botObj = connectionsTmp[terminalCurrentConnection];
+						var botF = botObj.publicData.botFunctions;
+						var settings = botObj.publicData.settings;
+						botF.botPluginDisable(terminalCommandArgs[1]);
+						settings.plugins.arrayValueRemove(terminalCommandArgs[1]);
+					} else {
+						terminalLog('Current connection is dead.');
+					}
 				})();
 				break;
 			case 'savesettings':
@@ -300,9 +332,11 @@ function terminalProcessInput(chunk) {
 							botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
 						}
 						for (var connection in connectionsTmp) {
-							var botObj = connectionsTmp[connection];
-							for (var plugin in botObj.pluginData) {
-								pluginReload(botObj, plugin);
+							if (connectionsTmp[connection]) {
+								var botObj = connectionsTmp[connection];
+								for (var plugin in botObj.pluginData) {
+									pluginReload(botObj, plugin);
+								}
 							}
 						}
 						terminalLog('> Settings loaded!');
@@ -373,8 +407,13 @@ function terminalProcessInput(chunk) {
 		}
 	}
 	if (chunk && chunk.charAt(0) != '/') {
-		terminalLog('['+connectionName+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
-		connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
+		if (connectionsTmp[terminalCurrentConnection] &&
+		!connectionsTmp[terminalCurrentConnection].ircConnection.destroyed) {
+			terminalLog('['+connectionName+':'+terminalLastChannel+'] '+connections[terminalCurrentConnection].botName+': '+chunk);
+			connectionsTmp[terminalCurrentConnection].ircConnection.write('PRIVMSG '+terminalLastChannel+' :'+chunk+'\r\n');
+		} else {
+			terminalLog('Current connection is dead.');
+		}
 	}
 }
 
@@ -733,20 +772,26 @@ function killAllnBotInstances(reason, force) {
 	force = force||false;
 	var connection;
 	for (connection in connectionsTmp) {
-		var botObj = connectionsTmp[connection];
-		var botF = botObj.publicData.botFunctions;
-		for (var plugin in botObj.pluginData) {
-			botF.botPluginDisable(plugin);
+		if (connectionsTmp[connection]) {
+			var botObj = connectionsTmp[connection];
+			var botF = botObj.publicData.botFunctions;
+			for (var plugin in botObj.pluginData) {
+				botF.botPluginDisable(plugin);
+			}
 		}
 	}
 	if (force === false) {
 		for (connection in connectionsTmp) {
-			connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
+			if (connectionsTmp[connection]) {
+				connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
+			}
 		}
 	}
 	if (force === true) {
 		for (connection in connectionsTmp) {
-			connectionsTmp[connection].kill();
+			if (connectionsTmp[connection]) {
+				connectionsTmp[connection].kill();
+			}
 		}
 	}
 }
@@ -1376,28 +1421,29 @@ function nBot_instance(settings, globalSettings) {
 				}
 			}
 			function connect() {
+				var c;
 				var connectionOptions = {
 					host: connectionInfo.host,
 					port: connectionInfo.port
 				};
 				var socks5 = false;
-				function initSocks(host, port, callback) {
+				function initSocks(host, port, user, pass, callback) {
 					var ipAdr;
 					var octet;
 					var ATYP = net.isIP(host);
 					var DST_ADDR = '';
-					var DST_PORT = ('000'+(+port).toString(16)).slice(-4);
+					var DST_PORT = numToHexByte(+port);
 					switch (ATYP) {
 						case 0:
 							ATYP = '03';
-							DST_ADDR += ('0'+host.length.toString(16)).slice(-2);
+							DST_ADDR += numToHexByte(+host.length);
 							DST_ADDR += host.toHex();
 							break;
 						case 4:
 							ATYP = '01';
 							ipAdr = host.split('.');
 							for (octet in ipAdr) {
-								DST_ADDR += ('0'+(ipAdr[octet]).toString(16)).slice(-2);
+								DST_ADDR += numToHexByte(+ipAdr[octet]);
 							}
 							break;
 						case 6:
@@ -1408,9 +1454,17 @@ function nBot_instance(settings, globalSettings) {
 							}
 							break;
 					}
+					function numToHexByte(num) {
+						var hex = num.toString(16);
+						if ((hex.length/2)%1 !== 0) {
+							hex = '0'+hex;
+						}
+						return hex;
+					}
 					function requestConnect() {
-						ircConnection.write(new Buffer('050100'+ATYP+DST_ADDR+DST_PORT, 'hex'));
-						ircConnection.once('data', function (data) {
+						//socks5(05), connect(01), reserved(00)
+						c.write(new Buffer('050100'+ATYP+DST_ADDR+DST_PORT, 'hex'));
+						c.once('data', function (data) {
 							//00 == succeeded
 							if (data.substr(2*1, 2) == '00') {
 								callback();
@@ -1420,12 +1474,12 @@ function nBot_instance(settings, globalSettings) {
 						});
 					}
 					function sendUnamePasswdAuth() {
-						var ULEN = ('0'+settings.socks5_username.length.toString(16)).slice(-2);
-						var UNAME = settings.socks5_username.toHex();
-						var PLEN = ('0'+settings.socks5_password.length.toString(16)).slice(-2);
-						var PASSWD = settings.socks5_password.toHex();
-						ircConnection.write(new Buffer('01'+ULEN+UNAME+PLEN+PASSWD, 'hex'));
-						ircConnection.once('data', function (data) {
+						var ULEN = numToHexByte(user.length);
+						var UNAME = user.toHex();
+						var PLEN = numToHexByte(pass.length);
+						var PASSWD = pass.toHex();
+						c.write(new Buffer('01'+ULEN+UNAME+PLEN+PASSWD, 'hex'));
+						c.once('data', function (data) {
 							//00 == succeeded
 							if (data.substr(2*1, 2) == '00') {
 								requestConnect();
@@ -1437,14 +1491,13 @@ function nBot_instance(settings, globalSettings) {
 					(function () {
 						var NMETHODS = 1;
 						var METHODS = '00';
-						if (settings.socks5_username && settings.socks5_password) {
+						if (user && pass) {
 							NMETHODS += 1;
 							METHODS += '02';
 						}
-						ircConnection.setEncoding('hex');
-						ircConnection.write(new Buffer('05'+('0'+NMETHODS.toString(16)).slice(-2)+METHODS, 'hex'));
-						ircConnection.once('data', function (data) {
-							//if chosen method == NO AUTHENTICATION(00)
+						c.setEncoding('hex');
+						c.write(new Buffer('05'+numToHexByte(NMETHODS)+METHODS, 'hex'));
+						c.once('data', function (data) {
 							if (data.substr(2*0, 2) == '05') {
 								if (data.substr(2*1, 2) == '00') {
 									requestConnect();
@@ -1458,26 +1511,30 @@ function nBot_instance(settings, globalSettings) {
 					})();
 				}
 				function initIrc() {
-					ircConnection.setEncoding('utf8');
-					ircConnection.on('data', ircConnectionOnData);
-					if (settings.ircServerPassword) {ircConnection.write('PASS '+settings.ircServerPassword+'\r\n');}
-					ircConnection.write('NICK '+connectionInfo.nick+'\r\n');
-					ircConnection.write('USER '+connectionInfo.nick+' '+connectionInfo.mode+' '+connectionInfo.host+' :'+connectionInfo.nick+'\r\n');
+					c.setEncoding('utf8');
+					c.on('data', ircConnectionOnData);
+					if (settings.ircServerPassword) {c.write('PASS '+settings.ircServerPassword+'\r\n');}
+					c.write('NICK '+connectionInfo.nick+'\r\n');
+					c.write('USER '+connectionInfo.nick+' '+connectionInfo.mode+' '+connectionInfo.host+' :'+connectionInfo.nick+'\r\n');
 				}
 				if (settings.socks5_host && settings.socks5_port) {
 					socks5 = true;
 					connectionOptions.host = settings.socks5_host;
 					connectionOptions.port = settings.socks5_port;
 				}
-				ircConnection = net.connect(connectionOptions,
+				c = net.connect(connectionOptions,
 					function() { //'connect' listener
 						if (socks5) {
-							initSocks(connectionInfo.host, connectionInfo.port, initIrc);
+							initSocks(connectionInfo.host,
+								connectionInfo.port,
+								settings.socks5_username,
+								settings.socks5_password, initIrc);
 						} else {
 							initIrc();
 						}
 				});
-				nBotObject.ircConnection=ircConnection;
+				ircConnection = c;
+				nBotObject.ircConnection = ircConnection;
 				botF.emitBotEvent('botIrcConnectionCreated', ircConnection);
 			}
 			connect();
