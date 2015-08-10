@@ -54,6 +54,8 @@ var SettingsConstructor = {
 				ircServerPassword: '',
 				socks5_host: '',
 				socks5_port: 1080,
+				socks5_username: '',
+				socks5_password: '',
 				channels: [ '#channel' ],
 				ircRelayServerEnabled: true,
 				ircMaxCommandResponseWaitQueue: 30,
@@ -730,14 +732,21 @@ function killAllnBotInstances(reason, force) {
 	reason = reason||'Leaving';
 	force = force||false;
 	var connection;
+	for (connection in connectionsTmp) {
+		var botObj = connectionsTmp[connection];
+		var botF = botObj.publicData.botFunctions;
+		for (var plugin in botObj.pluginData) {
+			botF.botPluginDisable(plugin);
+		}
+	}
 	if (force === false) {
 		for (connection in connectionsTmp) {
-				connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
+			connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
 		}
 	}
 	if (force === true) {
 		for (connection in connectionsTmp) {
-				connectionsTmp[connection].kill();
+			connectionsTmp[connection].kill();
 		}
 	}
 }
@@ -1399,23 +1408,54 @@ function nBot_instance(settings, globalSettings) {
 							}
 							break;
 					}
-					ircConnection.setEncoding('hex');
-					//socks5(05), one method(01), NO AUTHENTICATION(00)
-					ircConnection.write(new Buffer('050100', 'hex'));
-					ircConnection.once('data', function (data) {
-						//if chosen method == NO AUTHENTICATION(00)
-						if (data == '0500') {
-							ircConnection.write(new Buffer('050100'+ATYP+DST_ADDR+DST_PORT, 'hex'));
-							ircConnection.once('data', function (data) {
-								//00 == succeeded
-								if (data.substr(2*1, 2) == '00') {
-									callback();
-								} else {
-									botF.debugMsg('Error: Proxy traversal failed');
-								}
-							});
+					function requestConnect() {
+						ircConnection.write(new Buffer('050100'+ATYP+DST_ADDR+DST_PORT, 'hex'));
+						ircConnection.once('data', function (data) {
+							//00 == succeeded
+							if (data.substr(2*1, 2) == '00') {
+								callback();
+							} else {
+								botF.debugMsg('Error: Proxy traversal failed');
+							}
+						});
+					}
+					function sendUnamePasswdAuth() {
+						var ULEN = ('0'+settings.socks5_username.length.toString(16)).slice(-2);
+						var UNAME = settings.socks5_username.toHex();
+						var PLEN = ('0'+settings.socks5_password.length.toString(16)).slice(-2);
+						var PASSWD = settings.socks5_password.toHex();
+						ircConnection.write(new Buffer('01'+ULEN+UNAME+PLEN+PASSWD, 'hex'));
+						ircConnection.once('data', function (data) {
+							//00 == succeeded
+							if (data.substr(2*1, 2) == '00') {
+								requestConnect();
+							} else {
+								botF.debugMsg('Error: Proxy auth failed');
+							}
+						});
+					}
+					(function () {
+						var NMETHODS = 1;
+						var METHODS = '00';
+						if (settings.socks5_username && settings.socks5_password) {
+							NMETHODS += 1;
+							METHODS += '02';
 						}
-					});
+						ircConnection.setEncoding('hex');
+						ircConnection.write(new Buffer('05'+('0'+NMETHODS.toString(16)).slice(-2)+METHODS, 'hex'));
+						ircConnection.once('data', function (data) {
+							//if chosen method == NO AUTHENTICATION(00)
+							if (data.substr(2*0, 2) == '05') {
+								if (data.substr(2*1, 2) == '00') {
+									requestConnect();
+								} else if (data.substr(2*1, 2) == '02') {
+									sendUnamePasswdAuth();
+								} else if (data.substr(2*1, 2) == 'ff') {
+									botF.debugMsg('Error: Proxy rejected all known methods');
+								}
+							}
+						});
+					})();
 				}
 				function initIrc() {
 					ircConnection.setEncoding('utf8');
