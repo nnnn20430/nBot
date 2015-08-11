@@ -899,19 +899,8 @@ function nBot_instance(settings, globalSettings) {
 			prefix = message.charAt(0) == ':' ? message.substr(1, message.indexOf(' ')-1) : '';
 			command = message.substr((prefix ? ':'+prefix+' ' : '').length, message.substr((prefix ? ':'+prefix+' ' : '').length).indexOf(' '));
 			params = message.substr(((prefix ? ':'+prefix+' ' : '')+command+' ').length);
-			
-			while (true) {
-				if (params.charAt((middleParams ? middleParams+' ' : '').length) != ':' && params.indexOf(' ', (middleParams ? middleParams+' ' : ' ').length) != -1) {
-					middleParams += params.substr(middleParams.length, params.substr((middleParams ? middleParams+' ' : ' ').length).indexOf(' ')+1);
-				} else if (params.charAt((middleParams ? middleParams+' ' : '').length) == ':') {
-					trailingParams += params.substr((middleParams ? middleParams+' :' : ':').length);
-					break;
-				} else {
-					break;
-				}
-				if (loops > 512) {loops = 0; break;}
-				loops++;
-			}
+			middleParams = params.substr(0, (params.indexOf(':') != -1 ? params.indexOf(':') : params.length)).trim();
+			trailingParams = params.indexOf(':') != -1 ? params.substr(params.indexOf(':')+1) : '';
 			
 			return [message, prefix, command, params, middleParams, trailingParams];
 		},
