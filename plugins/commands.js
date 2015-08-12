@@ -376,7 +376,8 @@ var pluginObj = {
 		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {botF.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);}},
 		ctcpVersion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01VERSION I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.nick);}},
 		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {botF.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.nick);}},
-		ctcpTime: function (data) {if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);}}
+		ctcpTime: function (data) {if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);}},
+		ctcpClientinfo: function (data) {if (new RegExp('\x01CLIENTINFO\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01CLIENTINFO VERSION PING TIME CLIENTINFO\x01", data.nick);}}
 	}
 };
 
