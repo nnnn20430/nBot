@@ -29,48 +29,46 @@ process.on('uncaughtException', function (err) {
 //settings management
 var SettingsConstructor = {
 	main: function (modified) {
-		var mainSettings, attrname;
-		if (this!==SettingsConstructor) {
-			mainSettings = {
-				terminalSupportEnabled: true,
-				terminalInputPrefix: '>',
-				ircRelayServerEnabled: true,
-				ircRelayServerPort: 9977,
-				debugMessages: false
-			};
-			for (attrname in modified) {mainSettings[attrname]=modified[attrname];}
-			return mainSettings;
+		//force 'new' object keyword
+		if(!(this instanceof SettingsConstructor.main)) {
+			return new SettingsConstructor.main(modified);
 		}
+		var attrname;
+		this.terminalSupportEnabled = true;
+		this.terminalInputPrefix = '>';
+		this.ircRelayServerEnabled = true;
+		this.ircRelayServerPort = 9977;
+		this.debugMessages = false;
+		for (attrname in modified) {this[attrname]=modified[attrname];}
 	},
 	connection: function (modified) {
-		var connectionSettings, attrname;
-		if (this!==SettingsConstructor) {
-			connectionSettings = {
-				connectionName: 'Connection0',
-				botName: 'nBot',
-				botMode: '0',
-				ircServer: 'localhost',
-				ircServerPort: 6667,
-				ircServerPassword: '',
-				socks5_host: '',
-				socks5_port: 1080,
-				socks5_username: '',
-				socks5_password: '',
-				channels: [ '#channel' ],
-				ircRelayServerEnabled: true,
-				ircMaxCommandResponseWaitQueue: 30,
-				ircMultilineMessageMaxLines: 300,
-				pluginDir: './plugins',
-				plugins: [ 
-					'simpleMsg',
-					'commands',
-					'connectionErrorResolver'
-				],
-				pluginsSettings: {}
-			};
-			for (attrname in modified) {connectionSettings[attrname]=modified[attrname];}
-			return connectionSettings;
+		//force 'new' object keyword
+		if(!(this instanceof SettingsConstructor.connection)) {
+			return new SettingsConstructor.connection(modified);
 		}
+		var attrname;
+		this.connectionName = 'Connection0';
+		this.botName = 'nBot';
+		this.botMode = '0';
+		this.ircServer = 'localhost';
+		this.ircServerPort = 6667;
+		this.ircServerPassword = '';
+		this.socks5_host = '';
+		this.socks5_port = 1080;
+		this.socks5_username = '';
+		this.socks5_password = '';
+		this.channels = [ '#channel' ];
+		this.ircRelayServerEnabled = true;
+		this.ircResponseListenerLimit = 30;
+		this.ircMultilineMessageMaxLines = 300;
+		this.pluginDir = './plugins';
+		this.plugins = [ 
+			'simpleMsg',
+			'commands',
+			'connectionErrorResolver'
+		];
+		this.pluginsSettings = {};
+		for (attrname in modified) {this[attrname]=modified[attrname];}
 	}
 };
 
@@ -499,16 +497,16 @@ function initTerminalHandle() {
 
 //misc prototypes
 Object.defineProperty(Array.prototype, "diff", { 
-    value: function(a) {
+	value: function(a) {
 		return this.filter(function(i) {return a.indexOf(i) < 0;});
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(String.prototype, "replaceSpecialChars", { 
-    value: function(a) {
+	value: function(a) {
 		return this
 			.replace(/#csi;/g, '\x1B[')
 			.replace(/#c;/g, '\x03')
@@ -518,81 +516,82 @@ Object.defineProperty(String.prototype, "replaceSpecialChars", {
 			.replace(/#italic;/g, '\x16')
 			.replace(new RegExp('#x([0-9a-fA-F]{2});', 'g'), function(regex, hex){return hex.fromHex();})
 			.replace(new RegExp('#u([0-9a-fA-F]{4});', 'g'), function(regex, hex){return hex.fromUtf8Hex();});
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(Array.prototype, "arrayValueAdd", { 
-    value: function(a) {
-		return this.splice(this.lastIndexOf(this.slice(-1)[0])+1, 0, a);
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	value: function(a) {
+		this.splice(this.lastIndexOf(this.slice(-1)[0])+1, 0, a);
+		return true;
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(Array.prototype, "arrayValueRemove", { 
-    value: function(a) {
+	value: function(a) {
 		if (this.lastIndexOf(a) !== -1) {
 			return this.splice(this.lastIndexOf(a), 1);
 		}
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(String.prototype, "toHex", { 
-    value: function(a) {
+	value: function(a) {
 		return new Buffer(this.toString(), 'utf8').toString('hex');
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(String.prototype, "fromHex", { 
-    value: function(a) {
+	value: function(a) {
 		return new Buffer(this.toString(), 'hex').toString('utf8');
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(String.prototype, "toUtf8Hex", { 
-    value: function(a) {
-	    var hex, i;
-	
-	    var result = "";
-	    for (i=0; i<this.length; i++) {
-	        hex = this.charCodeAt(i).toString(16);
-	        result += ("000"+hex).slice(-4);
-	    }
-	
-	    return result;
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	value: function(a) {
+		var hex, i;
+		
+		var result = "";
+		for (i=0; i<this.length; i++) {
+			hex = this.charCodeAt(i).toString(16);
+			result += ("000"+hex).slice(-4);
+		}
+		
+		return result;
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 Object.defineProperty(String.prototype, "fromUtf8Hex", { 
-    value: function(a) {
-	    var j;
-	    var hexes = this.match(/.{1,4}/g) || [];
-	    var back = "";
-	    for(j = 0; j<hexes.length; j++) {
-	        back += String.fromCharCode(parseInt(hexes[j], 16));
-	    }
-	
-	    return back;
-    },
-    configurable: true,
-    writable: true,
-    enumerable: false
+	value: function(a) {
+		var j;
+		var hexes = this.match(/.{1,4}/g) || [];
+		var back = "";
+		for(j = 0; j<hexes.length; j++) {
+			back += String.fromCharCode(parseInt(hexes[j], 16));
+		}
+		
+		return back;
+	},
+	configurable: true,
+	writable: true,
+	enumerable: false
 });
 
 //random functions
@@ -608,54 +607,54 @@ function decode_utf8(s) {
 
 //https://gist.github.com/Mottie/7018157
 function expandIPv6Address(address) {
-    var fullAddress = "";
-    var expandedAddress = "";
-    var validGroupCount = 8;
-    var validGroupSize = 4;
-    var i;
+	var fullAddress = "";
+	var expandedAddress = "";
+	var validGroupCount = 8;
+	var validGroupSize = 4;
+	var i;
 
-    var ipv4 = "";
-    var extractIpv4 = /([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/;
-    var validateIpv4 = /((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})/;
+	var ipv4 = "";
+	var extractIpv4 = /([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/;
+	var validateIpv4 = /((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})/;
 
-    // look for embedded ipv4
-    if(validateIpv4.test(address))
-    {
-        groups = address.match(extractIpv4);
-        for(i=1; i<groups.length; i++)
-        {
-            ipv4 += ("00" + (parseInt(groups[i], 10).toString(16)) ).slice(-2) + ( i==2 ? ":" : "" );
-        }
-        address = address.replace(extractIpv4, ipv4);
-    }
+	// look for embedded ipv4
+	if(validateIpv4.test(address))
+	{
+		groups = address.match(extractIpv4);
+		for(i=1; i<groups.length; i++)
+		{
+			ipv4 += ("00" + (parseInt(groups[i], 10).toString(16)) ).slice(-2) + ( i==2 ? ":" : "" );
+		}
+		address = address.replace(extractIpv4, ipv4);
+	}
 
-    if(address.indexOf("::") == -1) // All eight groups are present.
-        fullAddress = address;
-    else // Consecutive groups of zeroes have been collapsed with "::".
-    {
-        var sides = address.split("::");
-        var groupsPresent = 0;
-        for(i=0; i<sides.length; i++)
-        {
-            groupsPresent += sides[i].split(":").length;
-        }
-        fullAddress += sides[0] + ":";
-        for(i=0; i<validGroupCount-groupsPresent; i++)
-        {
-            fullAddress += "0000:";
-        }
-        fullAddress += sides[1];
-    }
-    var groups = fullAddress.split(":");
-    for(i=0; i<validGroupCount; i++)
-    {
-        while(groups[i].length < validGroupSize)
-        {
-            groups[i] = "0" + groups[i];
-        }
-        expandedAddress += (i!=validGroupCount-1) ? groups[i] + ":" : groups[i];
-    }
-    return expandedAddress;
+	if(address.indexOf("::") == -1) // All eight groups are present.
+		fullAddress = address;
+	else // Consecutive groups of zeroes have been collapsed with "::".
+	{
+		var sides = address.split("::");
+		var groupsPresent = 0;
+		for(i=0; i<sides.length; i++)
+		{
+			groupsPresent += sides[i].split(":").length;
+		}
+		fullAddress += sides[0] + ":";
+		for(i=0; i<validGroupCount-groupsPresent; i++)
+		{
+			fullAddress += "0000:";
+		}
+		fullAddress += sides[1];
+	}
+	var groups = fullAddress.split(":");
+	for(i=0; i<validGroupCount; i++)
+	{
+		while(groups[i].length < validGroupSize)
+		{
+			groups[i] = "0" + groups[i];
+		}
+		expandedAddress += (i!=validGroupCount-1) ? groups[i] + ":" : groups[i];
+	}
+	return expandedAddress;
 }
 
 //misc functions
@@ -782,8 +781,11 @@ function killAllnBotInstances(reason, force) {
 	}
 	if (force === false) {
 		for (connection in connectionsTmp) {
-			if (connectionsTmp[connection]) {
+			if (connectionsTmp[connection] &&
+			!connectionsTmp[connection].ircConnection.destroyed) {
 				connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
+			} else {
+				connectionsTmp[connection].kill();
 			}
 		}
 	}
@@ -845,28 +847,26 @@ function nBotConnectionInit(connectionId) {
 	function handlebotDebugMessage(data) {
 		handleBotDebugMessageEvent(connectionId, data);
 	}
-	connectionsTmp[connectionId]=new nBot_instance(connections[connectionId], settings);
+	connectionsTmp[connectionId]=new Create_nBot_instance(connections[connectionId], settings);
 	connectionsTmp[connectionId].init();
 	connectionsTmp[connectionId].botEventsEmitter.on('botEvent', handleBotEvent);
 	connectionsTmp[connectionId].botEventsEmitter.on('botDebugMessage', handlebotDebugMessage);
 }
 
 //main bot class
-function nBot_instance(settings, globalSettings) {
+function Create_nBot_instance(settings, globalSettings) {
+	
+	//force 'new' object keyword
+	if(!(this instanceof Create_nBot_instance)) {
+		return new Create_nBot_instance(settings, globalSettings);
+	}
+	
+	//variables
 	var ircConnection;
 	var ircBotHost = "";
 	var ircChannelUsers = {};
-	var ircCommandReEventsEmitter = new events.EventEmitter(); ircCommandReEventsEmitter.setMaxListeners(settings.ircMaxCommandResponseWaitQueue+2);
 	var emitter = new events.EventEmitter(); emitter.setMaxListeners(0);
-	
-	//clean old command events
-	ircCommandReEventsEmitter.on('newListener', function (data) {
-		var listeners = ircCommandReEventsEmitter.listeners(data);
-		while (listeners.length > settings.ircMaxCommandResponseWaitQueue) {
-			ircCommandReEventsEmitter.removeListener(data, listeners[0]);
-			listeners = ircCommandReEventsEmitter.listeners(data);
-		}
-	});
+	var nBotObject = this;
 	
 	//bot variable object
 	var botV = {
@@ -874,7 +874,9 @@ function nBot_instance(settings, globalSettings) {
 			['o', '@'],
 			['v', '+']
 		],
-		ircNetworkServers: []
+		ircNetworkServers: [],
+		ircResponseListenerObj: {},
+		ircResponseListenerLimit: settings.ircResponseListenerLimit||30
 	};
 	
 	//bot functions object
@@ -1044,7 +1046,7 @@ function nBot_instance(settings, globalSettings) {
 		},
 		
 		//misc bot functions: convert between modes and prefixes
-		ircModePrefixConvert : function (convertTo, str) {
+		ircModePrefixConvert: function (convertTo, str) {
 			var strArray = str.split('');
 			var strChar;
 			var mode;
@@ -1069,6 +1071,107 @@ function nBot_instance(settings, globalSettings) {
 					break;
 			}
 			return strArray.join('');
+		},
+		
+		//misc bot functions: emit irc response to listeners
+		ircResponseListenerEmit: function (command, data) {
+			var newArray;
+			var listenerObj;
+			var save;
+			for (var id in botV.ircResponseListenerObj) {
+				newArray = [];
+				for (var listener in botV.ircResponseListenerObj[id]) {
+					listenerObj = botV.ircResponseListenerObj[id][listener];
+					save = true;
+					if (listenerObj.command == command) {
+						try {
+							if (listenerObj.condition(data) === true) {
+								try {
+									listenerObj.handle(data);
+									save = false;
+								} catch (e) {
+									botF.debugMsg('Error when emitting irc response command "'+command+'" event to listener "'+id+'": ('+e+')');
+								}
+							}
+						} catch (e) {
+							botF.debugMsg('Error checking irc response event condition for command "'+command+'" listener "'+id+'": ('+e+')');
+						}
+					}
+					if (botF.isNumeric(listenerObj.ttl)) {
+						if (listenerObj.ttl <= 0) {
+							save = false;
+						} else {
+							listenerObj.ttl--;
+						}
+					}
+					if (save) {
+						newArray.arrayValueAdd(listenerObj);
+					}
+				}
+				botV.ircResponseListenerObj[id] = newArray;
+			}
+		},
+		
+		//misc bot functions: add irc response listener
+		ircResponseListenerAdd: function (id, command, condition, handle, ttl) {
+			var response = false;
+			if (id && command && condition && handle) {
+				if (!(botV.ircResponseListenerObj[id] instanceof Array)) {
+					botV.ircResponseListenerObj[id] = [];
+				}
+				botV.ircResponseListenerObj[id].arrayValueAdd({
+					command: command,
+					condition: condition,
+					handle: handle,
+					ttl: ttl
+				});
+				if (botV.ircResponseListenerObj[id].length >
+				botV.ircResponseListenerLimit) {
+					botV.ircResponseListenerObj[id].splice(0, 1);
+				}
+				response = true;
+			}
+			return response;
+		},
+		
+		//misc bot functions: remove irc response listener(s)
+		ircResponseListenerRemove: function (id, command, condition, handle) {
+			var response = false;
+			var newArray;
+			var listenerObj;
+			var matchNeed;
+			var matched;
+			var save;
+			if (id && botV.ircResponseListenerObj[id]) {
+				if (command || condition || handle) {
+					for (var listener in botV.ircResponseListenerObj[id]) {
+						listenerObj = botV.ircResponseListenerObj[id][listener];
+						matchNeed = 0;
+						matched = 0;
+						save = true;
+						if (command) {matchNeed++;}
+						if (condition) {matchNeed++;}
+						if (handle) {matchNeed++;}
+						if (listenerObj.command == command) {
+							matched++;
+						}
+						if (listenerObj.condition == condition) {
+							matched++;
+						}
+						if (listenerObj.handle == handle) {
+							matched++;
+						}
+						if (matched == matchNeed) {save = false;}
+						if (save) {
+							newArray.arrayValueAdd(listenerObj);
+						}
+					}
+					botV.ircResponseListenerObj[id] = newArray;
+				} else {
+					delete botV.ircResponseListenerObj[id];
+				}
+			}
+			return response;
 		},
 		
 		//write raw data
@@ -1111,26 +1214,22 @@ function nBot_instance(settings, globalSettings) {
 		
 		ircSendCommandWHOIS: function (user, callback) {
 			ircConnection.write('WHOIS '+user+'\r\n');
-			function handleresponseWHOISEvent(user) {
-				ircCommandReEventsEmitter.once('responseWHOIS', function (data) {
-					if (data[1][0][3].split(' ')[1] == user) {
-						if (callback !== undefined) {callback(data);}
-					}else{handleresponseWHOISEvent(user);}
-				});
-			}
-			handleresponseWHOISEvent(user);
+			botF.ircResponseListenerAdd('core', '311', function (data) {
+				if (data[1][0][3].split(' ')[1] == user) {return true;}
+			}, function (data) {
+				if (callback !== undefined) {callback(data);}
+			}, 10);
 		},
 		
 		ircSendCommandWHO: function (channel, callback) {
 			ircConnection.write('WHO '+channel+'\r\n');
-			function handleresponseWHOEvent(channel) {
-				ircCommandReEventsEmitter.once('responseWHO', function (data) {
-					if (data[1][0][3].split(' ')[1] == channel) {
-						if (callback !== undefined) {callback(data);}
-					}else{handleresponseWHOEvent(channel);}
-				});
-			}
-			handleresponseWHOEvent(channel);
+			botF.ircResponseListenerAdd('core', '352', function (data) {
+				if (data[1][0][3].split(' ')[1] == channel) {
+					return true;
+				}
+			}, function (data) {
+				if (callback !== undefined) {callback(data);}
+			}, 10);
 		},
 		
 		ircSendCommandJOIN: function (channel) {
@@ -1289,15 +1388,14 @@ function nBot_instance(settings, globalSettings) {
 		
 		ircReceiveNumHandle311: function (data) {//RPL_WHOISUSER
 			botF.emitBotEvent('botReceivedNum311', data);
-			ircCommandReEventsEmitter.emit('responseWHOIS', data);
+			botF.ircResponseListenerEmit('311', data);
 			var params = data[1][0][3].split(' ');
 			if (params[1] == settings.botName) {ircBotHost=params[3];}
 		},
 		
 		ircReceiveNumHandle352: function (data) {//RPL_WHOREPLY
 			botF.emitBotEvent('botReceivedNum352', data);
-			ircCommandReEventsEmitter.emit('responseWHO', data);
-			
+			botF.ircResponseListenerEmit('352', data);
 		},
 		
 		ircReceiveNumHandle353: function (data) {//RPL_NAMREPLY
@@ -1530,29 +1628,32 @@ function nBot_instance(settings, globalSettings) {
 		}
 	};
 	
-	// nBot main object
-	var nBotObject = {
-		init: botF.initIrcBot,
-		ircConnection: ircConnection,
-		botEventsEmitter: function () {var botEventsEmitter = new events.EventEmitter(); botEventsEmitter.setMaxListeners(0); return botEventsEmitter;}(),
-		kill: function () {ircConnection.end(); ircConnection.destroy();},
-		publicData: {
-			settings: settings,
-			globalSettings: globalSettings,
-			ircBotHost: ircBotHost,
-			ircChannelUsers: ircChannelUsers,
-			botFunctions: botF,
-			botVariables: botV
-		},
-		pluginData: {}
+	//populate bot properties
+	this.init = botF.initIrcBot;
+	this.ircConnection = ircConnection;
+	this.botEventsEmitter = function () {
+		var botEventsEmitter = new events.EventEmitter();
+		botEventsEmitter.setMaxListeners(0);
+		return botEventsEmitter;
+	}();
+	this.kill = function () {
+		ircConnection.end();
+		ircConnection.destroy();
 	};
+	this.publicData = {
+		settings: settings,
+		globalSettings: globalSettings,
+		ircBotHost: ircBotHost,
+		ircChannelUsers: ircChannelUsers,
+		botFunctions: botF,
+		botVariables: botV
+	};
+	this.pluginData = {};
 	
 	//load plugins from settings
 	for (var index in settings.plugins) {
 		botF.botPluginLoad(settings.plugins[index],  settings.pluginDir+'/'+settings.plugins[index]+'.js');
 	}
-	
-	return nBotObject;
 }
 
 //load settings and start the bot

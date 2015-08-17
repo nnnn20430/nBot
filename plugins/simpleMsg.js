@@ -75,7 +75,7 @@ var pluginObj = {
 				if (handle !== undefined) {
 					for (var handleFound in pluginObj.msgListenerObj[id][name]) {
 						if (handle === pluginObj.msgListenerObj[id][name][handleFound]) {
-							delete pluginObj.msgListenerObj[id][name][handleFound];
+							pluginObj.msgListenerObj[id][name].splice(handleFound, 1);
 						}
 					}
 				} else {
