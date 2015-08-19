@@ -1191,7 +1191,7 @@ function Create_nBot_instance(settings, globalSettings) {
 			command += to;
 			command += " :\r\n";
 			var msgLength = 512-getBytes(command);
-			var dataArray = data.split(''), stringArray = [''];
+			var dataArray = ((''+data).split('')), stringArray = [''];
 			var count = 0;
 			var c = ircConnection;
 			var length;
@@ -1233,7 +1233,7 @@ function Create_nBot_instance(settings, globalSettings) {
 			command += to;
 			command += " :\r\n";
 			var msgLength = 512-getBytes(command);
-			var dataArray = data.split(''), stringArray = [''];
+			var dataArray = ((''+data).split('')), stringArray = [''];
 			var count = 0;
 			var c = ircConnection;
 			var length;
