@@ -1181,33 +1181,85 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		//irc command functions
 		ircSendCommandPRIVMSG: function (data, to, timeout, forceTimeout){
-			var privmsgLenght = 512-(":"+settings.botName+"!"+settings.botName+"@"+ircBotHost+" PRIVMSG "+to+" :\r\n").length;
-			var dataLengthRegExp = new RegExp('.{1,'+privmsgLenght+'}', 'g'), stringArray = [], c = 0, string;
+			var command = "";
+			command += ":";
+			command += settings.botName;
+			command += "!";
+			command += settings.botName;
+			command += "@"+ircBotHost;
+			command += " PRIVMSG ";
+			command += to;
+			command += " :\r\n";
+			var msgLength = 512-getBytes(command);
+			var dataArray = data.split(''), stringArray = [''];
+			var count = 0;
+			var c = ircConnection;
+			var length;
 			timeout=timeout||1000;
-			function writeData(data, to, c, timeout) {
-				setTimeout(function() {ircConnection.write('PRIVMSG '+to+' :'+data[c]+'\r\n'); c++; if (data[c] !== undefined) {writeData(data, to, c, timeout);}}, timeout);
+			function getBytes(string){
+				return Buffer.byteLength(string, 'utf8');
 			}
-			while ((string = dataLengthRegExp.exec(data)) !== null) {
-				stringArray[c]=string[0];c++;
+			function writeData(data, to, count, timeout) {
+				setTimeout(function() {
+					c.write('PRIVMSG '+to+' :'+data[count]+'\r\n');
+					count++;
+					if (data[count] !== undefined) {
+						writeData(data, to, count, timeout);
+					}
+				}, timeout);
+			}
+			for (var char in dataArray) {
+				length = getBytes(stringArray[count]+dataArray[char]);
+				if (length > msgLength) {
+					count++;
+					stringArray[count] = '';
+				}
+				stringArray[count] += dataArray[char];
 			}
 			if (!forceTimeout) {
-				if (c <= 1) {timeout=0;}
+				if (count <= 1) {timeout=0;}
 			}
 			writeData(stringArray, to, 0, timeout);
 		},
 		
 		ircSendCommandNOTICE: function (data, to, timeout, forceTimeout){
-			var privmsgLenght = 512-(":"+settings.botName+"!"+settings.botName+"@"+ircBotHost+" NOTICE "+to+" :\r\n").length;
-			var dataLengthRegExp = new RegExp('.{1,'+privmsgLenght+'}', 'g'), stringArray = [], c = 0, string;
+			var command = "";
+			command += ":";
+			command += settings.botName;
+			command += "!";
+			command += settings.botName;
+			command += "@"+ircBotHost;
+			command += " NOTICE ";
+			command += to;
+			command += " :\r\n";
+			var msgLength = 512-getBytes(command);
+			var dataArray = data.split(''), stringArray = [''];
+			var count = 0;
+			var c = ircConnection;
+			var length;
 			timeout=timeout||1000;
-			function writeData(data, to, c, timeout) {
-				setTimeout(function() {ircConnection.write('NOTICE '+to+' :'+data[c]+'\r\n'); c++; if (data[c] !== undefined) {writeData(data, to, c, timeout);}}, timeout);
+			function getBytes(string){
+				return Buffer.byteLength(string, 'utf8');
 			}
-			while ((string = dataLengthRegExp.exec(data)) !== null) {
-				stringArray[c]=string[0];c++;
+			function writeData(data, to, count, timeout) {
+				setTimeout(function() {
+					c.write('NOTICE '+to+' :'+data[count]+'\r\n');
+					count++;
+					if (data[count] !== undefined) {
+						writeData(data, to, count, timeout);
+					}
+				}, timeout);
+			}
+			for (var char in dataArray) {
+				length = getBytes(stringArray[count]+dataArray[char]);
+				if (length > msgLength) {
+					count++;
+					stringArray[count] = '';
+				}
+				stringArray[count] += dataArray[char];
 			}
 			if (!forceTimeout) {
-				if (c <= 1) {timeout=0;}
+				if (count <= 1) {timeout=0;}
 			}
 			writeData(stringArray, to, 0, timeout);
 		},
@@ -1515,7 +1567,7 @@ function Create_nBot_instance(settings, globalSettings) {
 				};
 				var socks5 = false;
 				function initSocks(host, port, user, pass, callback) {
-					var ipAdr;
+					var ipAddr;
 					var octet;
 					var ATYP = net.isIP(host);
 					var DST_ADDR = '';
@@ -1528,16 +1580,16 @@ function Create_nBot_instance(settings, globalSettings) {
 							break;
 						case 4:
 							ATYP = '01';
-							ipAdr = host.split('.');
-							for (octet in ipAdr) {
-								DST_ADDR += numToHexByte(+ipAdr[octet]);
+							ipAddr = host.split('.');
+							for (octet in ipAddr) {
+								DST_ADDR += numToHexByte(+ipAddr[octet]);
 							}
 							break;
 						case 6:
 							ATYP = '04';
-							ipAdr = expandIPv6Address(host).split(':');
-							for (octet in ipAdr) {
-								DST_ADDR += ipAdr[octet];
+							ipAddr = expandIPv6Address(host).split(':');
+							for (octet in ipAddr) {
+								DST_ADDR += ipAddr[octet];
 							}
 							break;
 					}
