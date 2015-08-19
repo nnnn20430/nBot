@@ -216,7 +216,7 @@ var pluginObj = {
 				try {
 					pluginObj.commandsObject[command](data);
 				} catch (e) {
-					botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+pluginObj.getCommandOrigin(command)+'" is erroneous: ('+e.stack+')');
+					botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+pluginObj.getCommandOrigin(command)+'" is erroneous: ('+e+')');
 				}
 			}
 		}
