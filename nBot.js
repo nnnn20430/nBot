@@ -1307,14 +1307,17 @@ function Create_nBot_instance(settings, globalSettings) {
 		//irc response handle functions
 		ircReceiveHandlePRIVMSG: function (data) {
 			botF.emitBotEvent('botReceivedPRIVMSG', data);
+			botF.ircResponseListenerEmit('PRIVMSG', data);
 		},
 		
 		ircReceiveHandleNOTICE: function (data) {
 			botF.emitBotEvent('botReceivedNOTICE', data);
+			botF.ircResponseListenerEmit('NOTICE', data);
 		},
 		
 		ircReceiveHandleJOIN: function (data) {
 			botF.emitBotEvent('botReceivedJOIN', data);
+			botF.ircResponseListenerEmit('JOIN', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
 				botF.ircUpdateUsersInChannel(data[5]||data[3]);
@@ -1326,6 +1329,7 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandlePART: function (data) {
 			botF.emitBotEvent('botReceivedPART', data);
+			botF.ircResponseListenerEmit('PART', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
 				if (ircChannelUsers[data[5]||data[3]] && ircChannelUsers[data[5]||data[3]][nick]) {
@@ -1336,6 +1340,7 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandleQUIT: function (data) {
 			botF.emitBotEvent('botReceivedQUIT', data);
+			botF.ircResponseListenerEmit('QUIT', data);
 			var nick = data[1].split('!')[0];
 			if (nick != settings.botName){
 				for (var channel in ircChannelUsers) {
@@ -1348,6 +1353,7 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandleMODE: function (data) {
 			botF.emitBotEvent('botReceivedMODE', data);
+			botF.ircResponseListenerEmit('MODE', data);
 			var modeParams = data[3].split(' ');
 			
 			if (modeParams[0].charAt(0) == '#') {
@@ -1383,19 +1389,23 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandleNICK: function (data) {
 			botF.emitBotEvent('botReceivedNICK', data);
+			botF.ircResponseListenerEmit('NICK', data);
 			var nick = data[1].split('!')[0];
-			if (nick != settings.botName){
-				for (var channel in ircChannelUsers) {
-					if (ircChannelUsers[channel][nick] !== undefined) {
-						ircChannelUsers[channel][data[3]]=ircChannelUsers[channel][nick];
-						delete ircChannelUsers[channel][nick];
-					}
+			var newnick = data[3];
+			if (nick == settings.botName){
+				settings.botName = newnick;
+			}
+			for (var channel in ircChannelUsers) {
+				if (ircChannelUsers[channel][nick] !== undefined) {
+					ircChannelUsers[channel][newnick]=ircChannelUsers[channel][nick];
+					delete ircChannelUsers[channel][nick];
 				}
 			}
 		},
 		
 		ircReceiveHandleKICK: function (data) {
 			botF.emitBotEvent('botReceivedKICK', data);
+			botF.ircResponseListenerEmit('KICK', data);
 			var by = data[1].split('!')[0];
 			var channel = data[3].split(' ')[0];
 			var nick = data[3].split(' ')[1];
@@ -1408,14 +1418,17 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveHandleTOPIC: function (data) {
 			botF.emitBotEvent('botReceivedTOPIC', data);
+			botF.ircResponseListenerEmit('TOPIC', data);
 		},
 		
 		ircReceiveHandleKILL: function (data) {
 			botF.emitBotEvent('botReceivedKILL', data);
+			botF.ircResponseListenerEmit('KILL', data);
 		},
 		
 		ircReceiveNumHandle005: function (data) {//RPL_ISUPPORT
 			botF.emitBotEvent('botReceivedNum005', data);
+			botF.ircResponseListenerEmit('005', data);
 			var params = data[1][0][3].split(' ');
 			for (var param in params) {
 				var match = params[param].match(/([A-Z]+)=(.*)/);
@@ -1452,10 +1465,12 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		ircReceiveNumHandle353: function (data) {//RPL_NAMREPLY
 			botF.emitBotEvent('botReceivedNum353', data);
+			botF.ircResponseListenerEmit('353', data);
 		},
 		
 		ircReceiveNumHandle364: function (data) {//RPL_LINKS
 			botF.emitBotEvent('botReceivedNum364', data);
+			botF.ircResponseListenerEmit('364', data);
 			botV.ircNetworkServers = [];
 			var parsedData, line, params;
 			for (line in data[1]) {
