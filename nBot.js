@@ -332,6 +332,8 @@ function terminalProcessInput(chunk) {
 						for (var connection in connectionsTmp) {
 							if (connectionsTmp[connection]) {
 								var botObj = connectionsTmp[connection];
+								botObj.publicData.settings = connections[connection];
+								botObj.publicData.globalSettings = settings;
 								for (var plugin in botObj.pluginData) {
 									pluginReload(botObj, plugin);
 								}
