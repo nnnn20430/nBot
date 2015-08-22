@@ -65,6 +65,7 @@ var SettingsConstructor = {
 		this.connectionName = 'Connection0';
 		this.botName = 'nBot';
 		this.botMode = '0';
+		this.botUpdateInterval = 10000;
 		this.ircServer = 'localhost';
 		this.ircServerPort = 6667;
 		this.ircServerPassword = '';
@@ -989,9 +990,18 @@ function Create_nBot_instance(settings, globalSettings) {
 		ircPostConnectionRegistrationHandle: function () {
 			var ircIntervalUpdate;
 			botF.debugMsg('connected to irc server!');
-			botF.ircSendCommandWHOIS(settings.botName, function (data) {botF.ircJoinMissingChannels(data);});
-			ircIntervalUpdate = setInterval(function () {botF.ircSendCommandWHOIS(settings.botName, function (data) {botF.ircJoinMissingChannels(data);});}, 10000);
-			nBotObject.ircConnection.once('close', function() {clearInterval(ircIntervalUpdate);});
+			botF.ircSendCommandWHOIS(settings.botName, function (data) {
+				botF.ircJoinMissingChannels(data);
+			});
+			ircIntervalUpdate = setInterval(function () {
+				botF.ircSendCommandWHOIS(settings.botName, 
+				function (data) {
+					botF.ircJoinMissingChannels(data);
+				});
+			}, settings.botUpdateInterval||10000);
+			nBotObject.ircConnection.once('close', function() {
+				clearInterval(ircIntervalUpdate);
+			});
 			botF.ircWriteData('LINKS');
 		},
 		
