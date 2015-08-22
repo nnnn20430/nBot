@@ -940,7 +940,7 @@ function Create_nBot_instance(settings, globalSettings) {
 					botF.ircSendCommandJOIN(missingChannels[channel]);
 				}
 				
-			}	
+			}
 		},
 		
 		//misc bot functions: update tracked user data in channel
@@ -990,7 +990,7 @@ function Create_nBot_instance(settings, globalSettings) {
 			var ircIntervalUpdate;
 			botF.debugMsg('connected to irc server!');
 			botF.ircSendCommandWHOIS(settings.botName, function (data) {botF.ircJoinMissingChannels(data);});
-			ircIntervalUpdate = setInterval(function () {botF.ircSendCommandWHOIS(settings.botName, function (data, lineArray) {botF.ircJoinMissingChannels(data, lineArray);});}, 10000);
+			ircIntervalUpdate = setInterval(function () {botF.ircSendCommandWHOIS(settings.botName, function (data) {botF.ircJoinMissingChannels(data);});}, 10000);
 			nBotObject.ircConnection.once('close', function() {clearInterval(ircIntervalUpdate);});
 			botF.ircWriteData('LINKS');
 		},
@@ -1226,6 +1226,11 @@ function Create_nBot_instance(settings, globalSettings) {
 				}, timeout);
 			}
 			for (var char in dataArray) {
+				if (dataArray[char] == '\x0a') {
+					count++;
+					stringArray[count] = '';
+					dataArray[char] = '';
+				}
 				length = getBytes(stringArray[count]+dataArray[char]);
 				if (length > msgLength) {
 					count++;
@@ -1268,6 +1273,11 @@ function Create_nBot_instance(settings, globalSettings) {
 				}, timeout);
 			}
 			for (var char in dataArray) {
+				if (dataArray[char] == '\x0a') {
+					count++;
+					stringArray[count] = '';
+					dataArray[char] = '';
+				}
 				length = getBytes(stringArray[count]+dataArray[char]);
 				if (length > msgLength) {
 					count++;
@@ -1703,6 +1713,15 @@ function Create_nBot_instance(settings, globalSettings) {
 						} else {
 							initIrc();
 						}
+				});
+				c.once('error', function (e) {
+					botF.debugMsg('Connection error: ('+e+').');
+				});
+				c.once('timeout', function (e) {
+					botF.debugMsg('Connection timedout: '+e+').');
+				});
+				c.once('close', function() {
+					botF.debugMsg('Connection closed.');
 				});
 				ircConnection = c;
 				nBotObject.ircConnection = ircConnection;
