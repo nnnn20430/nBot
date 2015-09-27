@@ -110,7 +110,9 @@ var pluginObj = {
 	
 	//message handling functions: handle PRIVMSG
 	msgParsePRIVMSG: function (data, callback) {
-		var nick = data[1].split('!')[0], to = data[4], message = data[5];
+		var nick = data[1].split('!')[0], 
+			to = data[4].split(' ')[0], 
+			message = data[5]?data[5]:data[4].split(' ')[1];
 		var messageARGS = botF.getArgsFromString(message)[0];
 		var target = to.charAt(0) == '#' ? to : nick;
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message, messageARGS: messageARGS, responseTarget: target};
@@ -123,7 +125,9 @@ var pluginObj = {
 	
 	//message handling functions: handle NOTICE
 	msgParseNOTICE: function (data, callback) {
-		var nick = data[1].split('!')[0], to = data[4], message = data[5];
+		var nick = data[1].split('!')[0], 
+			to = data[4].split(' ')[0], 
+			message = data[5]?data[5]:data[4].split(' ')[1];
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message};
 		if (!callback) {
 			pluginObj.msgEmit('NOTICE', parsedData);

@@ -819,17 +819,23 @@ function killAllnBotInstances(reason, force) {
 //misc functions: handle irc bot event from bot instance
 var instanceBotEventHandleObj = {
 	PRIVMSG: function (connection, data) {
+		var nick = data[1].split('!')[0], 
+			to = data[4].split(' ')[0], 
+			message = data[5]?data[5]:data[4].split(' ')[1];
 		var connectionName = connections[connection].connectionName||connection;
-		debugLog('['+connectionName+':'+data[4]+'] <'+data[1].split('!')[0]+'>: '+data[5]);
+		debugLog('['+connectionName+':'+to+'] <'+nick+'>: '+message);
 		if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
-			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
+			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+to+':'+message+'\n');
 		}
 	},
 	NOTICE: function (connection, data) {
+		var nick = data[1].split('!')[0], 
+			to = data[4].split(' ')[0], 
+			message = data[5]?data[5]:data[4].split(' ')[1];
 		var connectionName = connections[connection].connectionName||connection;
-		debugLog('[NOTICE('+connectionName+':'+data[4]+')] <'+data[1].split('!')[0]+'>: '+data[5]);
+		debugLog('[NOTICE('+connectionName+':'+to+')] <'+nick+'>: '+message);
 		if (settings.ircRelayServerEnabled && connections[connection].ircRelayServerEnabled) {
-			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+data[4]+':'+data[5]+'\n');
+			ircRelayServerEmitter.emit('write', connectionName+':'+data[1]+':'+to+':'+message+'\n');
 		}
 	}
 };
@@ -1728,7 +1734,7 @@ function Create_nBot_instance(settings, globalSettings) {
 					botF.debugMsg('Connection error: ('+e+').');
 				});
 				c.once('timeout', function (e) {
-					botF.debugMsg('Connection timedout: '+e+').');
+					botF.debugMsg('Connection timeout');
 				});
 				c.once('close', function() {
 					botF.debugMsg('Connection closed.');
