@@ -395,7 +395,7 @@ var pluginObj = {
 		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {botF.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.nick);}},
 		ctcpTime: function (data) {if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);}},
 		ctcpClientinfo: function (data) {if (new RegExp('\x01CLIENTINFO\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01CLIENTINFO VERSION PING TIME CLIENTINFO SOURCE\x01", data.nick);}},
-		ctcpSource: function (data) {if (new RegExp('\x01SOURCE\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01SOURCE http://git.mindcraft.si.eu.org/?p=nBot.git\x01", data.nick);}}
+		ctcpSource: function (data) {if (new RegExp('\x01SOURCE\x01', 'g').exec(data.message) !== null) {botF.ircSendCommandNOTICE("\x01SOURCE https://phabricator.mindcraft.si.eu.org/diffusion/NBOT/\x01", data.nick);}}
 	}
 };
 
