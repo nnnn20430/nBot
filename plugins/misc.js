@@ -717,4 +717,7 @@ module.exports.main = function (passedData) {
 		var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
 		botF.ircSendCommandPRIVMSG('Uptime: '+pluginObj.parsedSecondsToString(upTime), data.responseTarget);
 	}, 'uptime: print time passed since nBot process was started', pluginId);
+	
+	//plugin is ready
+	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };

@@ -213,4 +213,7 @@ module.exports.main = function (passedData) {
 			pluginObj.mpdSendCommand(data.messageARGS[1]);
 		}
 	}, 'mpd_raw "command": send command to mpd)', pluginId);
+	
+	//plugin is ready
+	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };

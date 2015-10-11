@@ -408,4 +408,7 @@ module.exports.main = function (passedData) {
 		settings.pluginsSettings[pluginId] = pluginSettings;
 		botF.botSettingsSave();
 	}
+	
+	//plugin is ready
+	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };

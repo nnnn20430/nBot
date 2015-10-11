@@ -532,4 +532,7 @@ module.exports.main = function (passedData) {
 			}
 		}
 	});
+	
+	//plugin is ready
+	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };

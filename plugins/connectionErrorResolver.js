@@ -92,4 +92,7 @@ module.exports.main = function (passedData) {
 	settings = botObj.publicData.settings;
 	pluginSettings = settings.pluginsSettings[pluginId];
 	ircChannelUsers = botObj.publicData.ircChannelUsers;
+	
+	//plugin is ready
+	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };
