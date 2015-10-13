@@ -212,7 +212,14 @@ module.exports.ready = false;
 
 //reserved functions
 
-//main function called when plugin is loaded
+//reserved functions: handle "botEvent" from bot (botEvent is used for irc related activity)
+module.exports.botEvent = function (event) {
+	switch (event.eventName) {
+		case 'botPluginReadyEvent': if (event.eventData == 'commands') {pluginObj.utilizeCommands();} break;
+	}
+};
+
+//reserved functions: main function called when plugin is loaded
 module.exports.main = function (passedData) {
 	//update variables
 	botObj = passedData.botObj;
