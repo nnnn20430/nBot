@@ -26,7 +26,6 @@ var readline = require('readline');
 var fs = require('fs');
 var util = require('util');
 var events = require('events');
-var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
 var vm = require('vm');
@@ -1055,6 +1054,7 @@ function Create_nBot_instance(settings, globalSettings) {
 					}
 					nBotObject.pluginData[id] = require(pluginPath);
 					nBotObject.pluginData[id].main({id: id, botObj: nBotObject});
+					botF.emitBotEvent('botPluginLoadedEvent', id);
 					if (nBotObject.pluginData[id].botEvent) {
 						pluginAddBotEventListener(id);
 					}

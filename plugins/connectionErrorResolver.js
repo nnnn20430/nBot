@@ -34,7 +34,6 @@ var net = require('net');
 var fs = require('fs');
 var util = require('util');
 var events = require('events');
-var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
 var vm = require('vm');
@@ -71,6 +70,7 @@ var pluginObj = {
 
 //exports
 module.exports.plugin = pluginObj;
+module.exports.ready = false;
 
 //reserved functions
 
@@ -94,5 +94,6 @@ module.exports.main = function (passedData) {
 	ircChannelUsers = botObj.publicData.ircChannelUsers;
 	
 	//plugin is ready
+	exports.ready = true;
 	botF.emitBotEvent('botPluginReadyEvent', pluginId);
 };

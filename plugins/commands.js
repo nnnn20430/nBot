@@ -194,6 +194,123 @@ var pluginObj = {
 		return isUserChanOp;
 	},
 	
+	//misc plugin functions: check if plugin is ready
+	pluginReadyCheck: function () {
+		if (botObj.pluginData.simpleMsg &&
+		botObj.pluginData.simpleMsg.ready) {
+			//plugin is ready
+			exports.ready = true;
+			botF.emitBotEvent('botPluginReadyEvent', pluginId);
+		}
+	},
+	
+	//misc plugin functions: add listeners to simpleMsg plugin
+	utilizeSimpleMsg: function () {
+		var simpleMsg = botObj.pluginData.simpleMsg.plugin;
+		simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
+			pluginObj.commandHandle(data);
+			pluginObj.dynamicFunctionHandle(data);
+			pluginObj.pluggableFunctionHandle(data);
+			if (pluginSettings.specificResponses[data.message] !== undefined) {
+				botF.ircSendCommandPRIVMSG(pluginSettings.specificResponses[data.message], data.responseTarget);
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'JOIN', function (data) {
+			if (data.nick != settings.botName){
+				if (pluginSettings.reactToJoinPart === true) {
+					var isNetsplit = false;
+					if (Object.keys(pluginObj.netsplitData[1]).length) {
+						if (pluginObj.netsplitData[1][data.nick]) {
+							isNetsplit = true;
+							delete pluginObj.netsplitData[1][data.nick];
+							if (pluginObj.netsplitData[0][1]) {
+								clearTimeout(pluginObj.netsplitData[0][1]);
+							}
+							pluginObj.netsplitData[0][1] = setTimeout(function () {
+								pluginObj.netsplitData[0][1] = false;
+								for (var channel in pluginObj.netsplitData[2]) {
+									botF.ircSendCommandPRIVMSG('Netsplit over!', channel);
+								}
+								pluginObj.netsplitData[2] = {};
+							}, 2000);
+						}
+					}
+					if (!isNetsplit) {
+						botF.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
+						if (data.nick == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
+					}
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
+			if (data.nick != settings.botName){
+				if (pluginSettings.reactToJoinPart === true) {
+					botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channel);
+				}
+				if(pluginObj.isOp(data.nick)){
+					pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
+					botF.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
+			if (data.nick != settings.botName){
+				if(pluginObj.isOp(data.nick)){pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);}
+				if (pluginSettings.reactToJoinPart === true) {
+					//detect netsplits
+					var isNetsplit = false;
+					for (var server in botV.ircNetworkServers) {
+						if (data.reason.split(' ')[0] == botV.ircNetworkServers[server].mask) {
+							isNetsplit = true;
+						}
+					}
+					if (isNetsplit) {
+						if (pluginObj.netsplitData[0][0]) {
+							clearTimeout(pluginObj.netsplitData[0][0]);
+						}
+						pluginObj.netsplitData[0][0] = setTimeout(function () {
+							pluginObj.netsplitData[0][0] = false;
+							for (var channel in pluginObj.netsplitData[2]) {
+								botF.ircSendCommandPRIVMSG('Netsplit: '+data.reason.split(' ')[0]+'<=>'+data.reason.split(' ')[1]+'.', channel);
+							}
+						}, 2000);
+						pluginObj.netsplitData[1][data.nick] = true;
+						for (var channelS in data.channels) {
+							pluginObj.netsplitData[2][data.channels[channelS]] = true;
+						}
+					} else {
+						for (var channel in data.channels) {
+							botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
+						}
+					}
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+			if (data.nick != settings.botName){
+				if(pluginObj.isOp(data.nick)){
+					pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
+					botF.ircSendCommandPRIVMSG('You have changed your authenticated operator nickname you have been de-authenticated', data.newnick);
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
+			if (data.nick != settings.botName){
+				if(pluginObj.isOp(data.nick)){
+					pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
+					botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
+				}
+			}
+		});
+		
+		pluginObj.pluginReadyCheck();
+	},
+	
 	//bot command handle functions
 	
 	//bot command handle functions: command help manager
@@ -401,6 +518,7 @@ var pluginObj = {
 
 //exports
 module.exports.plugin = pluginObj;
+module.exports.ready = false;
 
 //reserved functions
 
@@ -409,6 +527,7 @@ module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		//make sure operator list is clean if new connection is made
 		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveCommands) {pluginObj.commandsRemoveByOrigin(event.eventData);} break;
+		case 'botPluginReadyEvent': if (event.eventData == 'simpleMsg') {pluginObj.utilizeSimpleMsg();} break;
 	}
 };
 
@@ -430,109 +549,9 @@ module.exports.main = function (passedData) {
 		botF.botSettingsSave();
 	}
 	
-	//add listeners to simpleMsg plugin
-	var simpleMsg = botObj.pluginData.simpleMsg.plugin;
-	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
-		pluginObj.commandHandle(data);
-		pluginObj.dynamicFunctionHandle(data);
-		pluginObj.pluggableFunctionHandle(data);
-		if (pluginSettings.specificResponses[data.message] !== undefined) {
-			botF.ircSendCommandPRIVMSG(pluginSettings.specificResponses[data.message], data.responseTarget);
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'JOIN', function (data) {
-		if (data.nick != settings.botName){
-			if (pluginSettings.reactToJoinPart === true) {
-				var isNetsplit = false;
-				if (Object.keys(pluginObj.netsplitData[1]).length) {
-					if (pluginObj.netsplitData[1][data.nick]) {
-						isNetsplit = true;
-						delete pluginObj.netsplitData[1][data.nick];
-						if (pluginObj.netsplitData[0][1]) {
-							clearTimeout(pluginObj.netsplitData[0][1]);
-						}
-						pluginObj.netsplitData[0][1] = setTimeout(function () {
-							pluginObj.netsplitData[0][1] = false;
-							for (var channel in pluginObj.netsplitData[2]) {
-								botF.ircSendCommandPRIVMSG('Netsplit over!', channel);
-							}
-							pluginObj.netsplitData[2] = {};
-						}, 2000);
-					}
-				}
-				if (!isNetsplit) {
-					botF.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
-					if (data.nick == "nnnn20430"){botF.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
-				}
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
-		if (data.nick != settings.botName){
-			if (pluginSettings.reactToJoinPart === true) {
-				botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channel);
-			}
-			if(pluginObj.isOp(data.nick)){
-				pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
-				botF.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
-		if (data.nick != settings.botName){
-			if(pluginObj.isOp(data.nick)){pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);}
-			if (pluginSettings.reactToJoinPart === true) {
-				//detect netsplits
-				var isNetsplit = false;
-				for (var server in botV.ircNetworkServers) {
-					if (data.reason.split(' ')[0] == botV.ircNetworkServers[server].mask) {
-						isNetsplit = true;
-					}
-				}
-				if (isNetsplit) {
-					if (pluginObj.netsplitData[0][0]) {
-						clearTimeout(pluginObj.netsplitData[0][0]);
-					}
-					pluginObj.netsplitData[0][0] = setTimeout(function () {
-						pluginObj.netsplitData[0][0] = false;
-						for (var channel in pluginObj.netsplitData[2]) {
-							botF.ircSendCommandPRIVMSG('Netsplit: '+data.reason.split(' ')[0]+'<=>'+data.reason.split(' ')[1]+'.', channel);
-						}
-					}, 2000);
-					pluginObj.netsplitData[1][data.nick] = true;
-					for (var channelS in data.channels) {
-						pluginObj.netsplitData[2][data.channels[channelS]] = true;
-					}
-				} else {
-					for (var channel in data.channels) {
-						botF.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
-					}
-				}
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
-		if (data.nick != settings.botName){
-			if(pluginObj.isOp(data.nick)){
-				pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
-				botF.ircSendCommandPRIVMSG('You have changed your authenticated operator nickname you have been de-authenticated', data.newnick);
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
-		if (data.nick != settings.botName){
-			if(pluginObj.isOp(data.nick)){
-				pluginObj.authenticatedOpUsers.arrayValueRemove(data.nick);
-				botF.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
-			}
-		}
-	});
-	
-	//plugin is ready
-	botF.emitBotEvent('botPluginReadyEvent', pluginId);
+	//check and utilize dependencies
+	if (botObj.pluginData.simpleMsg &&
+	botObj.pluginData.simpleMsg.ready) {
+		pluginObj.utilizeSimpleMsg();
+	}
 };

@@ -34,7 +34,6 @@ var net = require('net');
 var fs = require('fs');
 var util = require('util');
 var events = require('events');
-var sys = require('sys');
 var exec = require('child_process').exec;
 var path = require('path');
 var dgram = require('dgram');
@@ -300,6 +299,7 @@ var pluginObj = {
 		}
 	},
 	
+	//convert values
 	convertValue: function (from, to, value) {
 		var baseValue,
 			convertedValue,
@@ -502,6 +502,7 @@ var pluginObj = {
 		return convertedValue;
 	},
 	
+	//convert string to leet
 	strTo1337: function (str) {
 		var strArray = str.split('');
 		var strChar;
@@ -525,10 +526,12 @@ var pluginObj = {
 		return strArray.join('');
 	},
 	
+	//check if year is a leap year
 	isLeapYear: function (year) {
 		return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0));
 	},
 	
+	//get array of leap years using range
 	leapYearRange: function (start, end) {
 		var leapYears = [];
 		for (var i = start; i <= end; i++) {
@@ -539,6 +542,7 @@ var pluginObj = {
 		return leapYears;
 	},
 	
+	//hostname history feature init
 	hostnameHistoryInit: function () {
 		var commandsPlugin = botObj.pluginData.commands.plugin;
 		commandsPlugin.commandAdd('hosthistory', function (data) {
@@ -553,6 +557,7 @@ var pluginObj = {
 		}, 'hosthistory "hostname": prints list of known nicknames associated with the hostname', pluginId);
 	},
 	
+	//keep track of hostnames
 	hostnameHistoryTrack: function (data) {
 		var hostname = data.rawdata[0].split(' ')[0].split('@')[1];
 		var hostHistoryData = pluginObj.hostHistoryData;
@@ -568,11 +573,141 @@ var pluginObj = {
 		if (!nickKnown) {
 			hostHistoryData[hostname].arrayValueAdd(data.nick);
 		}
+	},
+	
+	//check if plugin is ready
+	pluginReadyCheck: function () {
+		if (
+		(botObj.pluginData.simpleMsg &&
+		botObj.pluginData.simpleMsg.ready) &&
+		(botObj.pluginData.commands &&
+		botObj.pluginData.commands.ready)
+		) {
+			//plugin is ready
+			exports.ready = true;
+			botF.emitBotEvent('botPluginReadyEvent', pluginId);
+		}
+	},
+	
+	//add listeners to simpleMsg plugin
+	utilizeSimpleMsg: function () {
+		var simpleMsg = botObj.pluginData.simpleMsg.plugin;
+		simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
+			pluginObj.mainMiscMsgHandle(data);
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
+			if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
+				delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
+			for (var i in data.channels) {
+				if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+					delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+			for (var i in data.channels) {
+				if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+					pluginObj.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+					delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+				}
+			}
+		});
+		
+		simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
+			if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
+				delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+			}
+		});
+		
+		pluginObj.pluginReadyCheck();
+	},
+	
+	//add commands to commands plugin
+	utilizeCommands: function () {
+		var commandsPlugin = botObj.pluginData.commands.plugin;
+		commandsPlugin.commandAdd('parseseconds', function (data) {
+			var parsedTime = pluginObj.parseSeconds(data.messageARGS[1]);
+			botF.ircSendCommandPRIVMSG(pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
+		}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
+		
+		commandsPlugin.commandAdd('parsetime', function (data) {
+			var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
+			botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
+		}, 'parsetime "time": parse "y d h m s" to seconds', pluginId);
+		
+		commandsPlugin.commandAdd('sendwol', function (data) {
+			pluginObj.sendWoL(data.messageARGS[1], data.messageARGS[2]);
+		}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
+		
+		commandsPlugin.commandAdd('convert', function (data) {
+			var convertedValue;
+			botF.ircSendCommandPRIVMSG((convertedValue = pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
+		}, 'convert "from" "to" "value": convert value to another', pluginId);
+		
+		commandsPlugin.commandAdd('1337', function (data) {
+			botF.ircSendCommandPRIVMSG(pluginObj.strTo1337(data.messageARGS[1]), data.responseTarget);
+		}, '1337 "text": convert text to 1337 text', pluginId);
+		
+		commandsPlugin.commandAdd('countdown', function (data) {
+			var timeoutId;
+			var response = "";
+			var i;
+			var parsedTime;
+			var date = Math.round(new Date().getTime()/1000);
+			switch (data.messageARGS[1].toUpperCase()) {
+				case 'SET':
+					timeoutId = setTimeout(function () {
+						botF.ircSendCommandPRIVMSG('Countdown "'+data.messageARGS[2]+'" finished.', data.responseTarget);
+						delete pluginObj.countdownDataObj[data.messageARGS[2]];
+					}, data.messageARGS[3]*1000);
+					pluginObj.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
+					break;
+				case 'REMOVE':
+					clearTimeout(pluginObj.countdownDataObj[data.messageARGS[2]][0]);
+					delete pluginObj.countdownDataObj[data.messageARGS[2]];
+					break;
+				case 'LIST':
+					for (i in pluginObj.countdownDataObj) {
+						response += '"'+i+'", ';
+					}
+					botF.ircSendCommandPRIVMSG('Current countdowns: '+response.replace(/, $/, ".").replace(/^$/, 'No running countdowns.'), data.responseTarget);
+					break;
+				case 'SHOW':
+					parsedTime = pluginObj.parseSeconds(pluginObj.countdownDataObj[data.messageARGS[2]][1]-date);
+					console.log(pluginObj.countdownDataObj[data.messageARGS[2]][1]+' '+date);
+					botF.ircSendCommandPRIVMSG('Time left: '+pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
+					break;
+			}
+		}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
+		
+		commandsPlugin.commandAdd('reverse', function (data) {
+			var txt = data.messageARGS[1], txtr = ''; 
+			var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
+			botF.ircSendCommandPRIVMSG(txtr, data.responseTarget);
+		}, 'reverse "text": reverse text', pluginId);
+		
+		commandsPlugin.commandAdd('randomnumber', function (data) {
+			botF.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
+		}, 'randomnumber "min" "max": print random number', pluginId);
+		
+		commandsPlugin.commandAdd('uptime', function (data) {
+			var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
+			botF.ircSendCommandPRIVMSG('Uptime: '+pluginObj.parsedSecondsToString(upTime), data.responseTarget);
+		}, 'uptime: print time passed since nBot process was started', pluginId);
+		
+		pluginObj.pluginReadyCheck();
 	}
 };
 
 //exports
 module.exports.plugin = pluginObj;
+module.exports.ready = false;
 
 //reserved functions
 
@@ -586,6 +721,12 @@ module.exports.botEvent = function (event) {
 					delete pluginObj.countdownDataObj[countdown];
 				}
 			})();
+			break;
+		case 'botPluginReadyEvent':
+			switch (event.eventData) {
+				case 'simpleMsg': pluginObj.utilizeSimpleMsg(); break;
+				case 'commands': pluginObj.utilizeCommands(); break;
+			}
 			break;
 	}
 };
@@ -611,113 +752,13 @@ module.exports.main = function (passedData) {
 	//call main feature controlling function
 	pluginObj.miscFeatureInit();
 	
-	//add listeners to simpleMsg plugin
-	var simpleMsg = botObj.pluginData.simpleMsg.plugin;
-	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
-		pluginObj.mainMiscMsgHandle(data);
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
-		if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
-			delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
-		for (var i in data.channels) {
-			if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
-				delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
-		for (var i in data.channels) {
-			if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
-				pluginObj.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
-				delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
-			}
-		}
-	});
-	
-	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
-		if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
-			delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
-		}
-	});
-	
-	//add commands to commands plugin
-	var commandsPlugin = botObj.pluginData.commands.plugin;
-	commandsPlugin.commandAdd('parseseconds', function (data) {
-		var parsedTime = pluginObj.parseSeconds(data.messageARGS[1]);
-		botF.ircSendCommandPRIVMSG(pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
-	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
-	
-	commandsPlugin.commandAdd('parsetime', function (data) {
-		var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
-		botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
-	}, 'parsetime "time": parse "y d h m s" to seconds', pluginId);
-	
-	commandsPlugin.commandAdd('sendwol', function (data) {
-		pluginObj.sendWoL(data.messageARGS[1], data.messageARGS[2]);
-	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
-	
-	commandsPlugin.commandAdd('convert', function (data) {
-		var convertedValue;
-		botF.ircSendCommandPRIVMSG((convertedValue = pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
-	}, 'convert "from" "to" "value": convert value to another', pluginId);
-	
-	commandsPlugin.commandAdd('1337', function (data) {
-		botF.ircSendCommandPRIVMSG(pluginObj.strTo1337(data.messageARGS[1]), data.responseTarget);
-	}, '1337 "text": convert text to 1337 text', pluginId);
-	
-	commandsPlugin.commandAdd('countdown', function (data) {
-		var timeoutId;
-		var response = "";
-		var i;
-		var parsedTime;
-		var date = Math.round(new Date().getTime()/1000);
-		switch (data.messageARGS[1].toUpperCase()) {
-			case 'SET':
-				timeoutId = setTimeout(function () {
-					botF.ircSendCommandPRIVMSG('Countdown "'+data.messageARGS[2]+'" finished.', data.responseTarget);
-					delete pluginObj.countdownDataObj[data.messageARGS[2]];
-				}, data.messageARGS[3]*1000);
-				pluginObj.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
-				break;
-			case 'REMOVE':
-				clearTimeout(pluginObj.countdownDataObj[data.messageARGS[2]][0]);
-				delete pluginObj.countdownDataObj[data.messageARGS[2]];
-				break;
-			case 'LIST':
-				for (i in pluginObj.countdownDataObj) {
-					response += '"'+i+'", ';
-				}
-				botF.ircSendCommandPRIVMSG('Current countdowns: '+response.replace(/, $/, ".").replace(/^$/, 'No running countdowns.'), data.responseTarget);
-				break;
-			case 'SHOW':
-				parsedTime = pluginObj.parseSeconds(pluginObj.countdownDataObj[data.messageARGS[2]][1]-date);
-				console.log(pluginObj.countdownDataObj[data.messageARGS[2]][1]+' '+date);
-				botF.ircSendCommandPRIVMSG('Time left: '+pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
-				break;
-		}
-	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
-	
-	commandsPlugin.commandAdd('reverse', function (data) {
-		var txt = data.messageARGS[1], txtr = ''; 
-		var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
-		botF.ircSendCommandPRIVMSG(txtr, data.responseTarget);
-	}, 'reverse "text": reverse text', pluginId);
-	
-	commandsPlugin.commandAdd('randomnumber', function (data) {
-		botF.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
-	}, 'randomnumber "min" "max": print random number', pluginId);
-	
-	commandsPlugin.commandAdd('uptime', function (data) {
-		var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
-		botF.ircSendCommandPRIVMSG('Uptime: '+pluginObj.parsedSecondsToString(upTime), data.responseTarget);
-	}, 'uptime: print time passed since nBot process was started', pluginId);
-	
-	//plugin is ready
-	botF.emitBotEvent('botPluginReadyEvent', pluginId);
+	//check and utilize dependencies
+	if (botObj.pluginData.simpleMsg &&
+	botObj.pluginData.simpleMsg.ready) {
+		pluginObj.utilizeSimpleMsg();
+	}
+	if (botObj.pluginData.commands &&
+	botObj.pluginData.commands.ready) {
+		pluginObj.utilizeCommands();
+	}
 };
