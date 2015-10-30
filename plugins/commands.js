@@ -463,7 +463,8 @@ var pluginObj = {
 		['pluginload', 'pluginload "plugin": load a plugin (op only)'],
 		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
 		['date', 'date [UTC|ISO|UNIX]: get current date'],
-		['sh', 'sh "shell expresion": run commands through /bin/sh (op only)']
+		['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
+		['binary', 'binary ENCODE|DECODE "string"']
 	],
 	
 	//bot commands object
@@ -501,7 +502,8 @@ var pluginObj = {
 		pluginload: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
 		plugindisable: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
 		date: function (data) {var date = ''; switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'UTC': date = new Date().toUTCString(); break; case 'ISO': date = new Date().toISOString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} botF.ircSendCommandPRIVMSG(date, data.responseTarget);},
-		sh: function (data) {if(pluginObj.isOp(data.nick) === true) {exec(data.messageARGS[1], function(error, stdout, stderr){botF.ircSendCommandPRIVMSG(stdout.replace(/\n/g, ' ;; '), data.responseTarget);});}}
+		sh: function (data) {if(pluginObj.isOp(data.nick) === true) {exec(data.messageARGS[1], function(error, stdout, stderr){botF.ircSendCommandPRIVMSG(stdout.replace(/\n/g, ' ;; '), data.responseTarget);});}},
+		binary: function (data) {var response = '', strArr, i, message = ''; for (i in data.messageARGS) {if (i > 1) {message += ' '+data.messageARGS[i];}} message=message.substr(1); switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'ENCODE': strArr = message.split(''); for (i in strArr) {response += ' '+('0000000'+parseInt(new Buffer(strArr[i].toString(), 'utf8').toString('hex'), 16).toString(2)).slice(-8);} response=response.substr(1); break; case 'DECODE': message=message.split(' ').join(''); i=0; while (8*(i+1) <= message.length) {response += new Buffer(parseInt(message.substr(8*i, 8), 2).toString(16), 'hex').toString('utf8'); i++;}} botF.ircSendCommandPRIVMSG(response, data.responseTarget);}
 	},
 	
 	//bot pluggable functions object

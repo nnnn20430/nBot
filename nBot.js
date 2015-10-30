@@ -914,18 +914,11 @@ function Create_nBot_instance(settings, globalSettings) {
 		
 		//misc bot functions: parse irc message line
 		ircParseMessageLine: function (message) {
-			var prefix = '';
-			var command = '';
-			var params = '';
-			var middleParams = '';
-			var trailingParams = '';
-			var loops = 0;
-			
-			prefix = message.charAt(0) == ':' ? message.substr(1, message.indexOf(' ')-1) : '';
-			command = message.substr((prefix ? ':'+prefix+' ' : '').length, message.substr((prefix ? ':'+prefix+' ' : '').length).indexOf(' '));
-			params = message.substr(((prefix ? ':'+prefix+' ' : '')+command+' ').length);
-			middleParams = params.substr(0, (params.indexOf(':') != -1 ? params.indexOf(':') : params.length)).trim();
-			trailingParams = params.indexOf(':') != -1 ? params.substr(params.indexOf(':')+1) : '';
+			var prefix = message.charAt(0) == ':' ? message.substr(1, message.indexOf(' ')-1) : '';
+			var command = message.substr((prefix ? ':'+prefix+' ' : '').length, message.substr((prefix ? ':'+prefix+' ' : '').length).indexOf(' '));
+			var params = message.substr(((prefix ? ':'+prefix+' ' : '')+command+' ').length);
+			var middleParams = params.substr(0, (params.indexOf(' :') != -1 ? params.indexOf(' :') : params.length)).trim();
+			var trailingParams = params.indexOf(' :') != -1 ? params.substr(params.indexOf(' :')+2) : '';
 			
 			return [message, prefix, command, params, middleParams, trailingParams];
 		},
