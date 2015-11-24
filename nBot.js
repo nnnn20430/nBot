@@ -959,7 +959,8 @@ function Create_nBot_instance(settings, globalSettings) {
 							isHere: params[6].charAt(0) == 'H' ? true : false,
 							isGlobalOP: params[6].charAt(1) == '*' ? true : false,
 							mode: botF.ircModePrefixConvert('mode', (params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1))),
-							realname: data[1][line][5]
+							hopcount: data[1][line][5].split(' ')[0],
+							realname: data[1][line][5].split(' ').slice(1).join(' ')
 						};
 					}
 				}
