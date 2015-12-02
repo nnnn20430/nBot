@@ -1623,7 +1623,7 @@ function Create_nBot_instance(settings, globalSettings) {
 					var octet;
 					var ATYP = net.isIP(host);
 					var DST_ADDR = '';
-					var DST_PORT = numToHexByte(+port);
+					var DST_PORT = ('00'+numToHexByte(+port)).slice(-4);
 					switch (ATYP) {
 						case 0:
 							ATYP = '03';
