@@ -1132,8 +1132,8 @@ function Create_nBot_instance(settings, globalSettings) {
 			for (var id in botV.ircResponseListenerObj) {
 				listenerArr = Object.assign([], botV.ircResponseListenerObj[id]);
 				newArray = [];
-				for (var listener in listenerArr[id]) {
-					listenerObj = listenerArr[id][listener];
+				for (var listener in listenerArr) {
+					listenerObj = listenerArr[listener];
 					save = true;
 					if (listenerObj.command == command) {
 						try {
