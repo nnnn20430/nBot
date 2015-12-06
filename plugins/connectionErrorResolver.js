@@ -48,14 +48,12 @@ var pluginObj = {
 			if (!pluginDisabled) {
 				ircConnection.end();
 				ircConnection.destroy();
-				botF.debugMsg("Got error: "+e.message);
 			}
 		});
 		ircConnection.once('timeout', function (e) {
 			if (!pluginDisabled) {
 				ircConnection.end();
 				ircConnection.destroy();
-				botF.debugMsg('connection timeout');
 			}
 		});
 		ircConnection.once('close', function() {

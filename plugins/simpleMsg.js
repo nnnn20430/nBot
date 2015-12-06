@@ -109,9 +109,9 @@ var pluginObj = {
 	
 	//message handling functions: handle PRIVMSG
 	msgParsePRIVMSG: function (data, callback) {
-		var nick = data[1].split('!')[0], 
-			to = data[4].split(' ')[0], 
-			message = data[5]?data[5]:data[4].split(' ')[1];
+		var nick = data[1][0], 
+			to = data[4][0], 
+			message = data[5]||data[4][1];
 		var messageARGS = botF.getArgsFromString(message)[0];
 		var target = to.charAt(0) == '#' ? to : nick;
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message, messageARGS: messageARGS, responseTarget: target};
@@ -124,9 +124,9 @@ var pluginObj = {
 	
 	//message handling functions: handle NOTICE
 	msgParseNOTICE: function (data, callback) {
-		var nick = data[1].split('!')[0], 
-			to = data[4].split(' ')[0], 
-			message = data[5]?data[5]:data[4].split(' ')[1];
+		var nick = data[1][0], 
+			to = data[4][0], 
+			message = data[5]||data[4][1];
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message};
 		if (!callback) {
 			pluginObj.msgEmit('NOTICE', parsedData);
@@ -137,8 +137,8 @@ var pluginObj = {
 	
 	//message handling functions: handle JOIN
 	msgParseJOIN: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var channel = data[5]||data[3];
+		var nick = data[1][0];
+		var channel = data[5]||data[4][0];
 		var parsedData = {rawdata: data, nick: nick, channel: channel};
 		if (!callback) {
 			pluginObj.msgEmit('JOIN', parsedData);
@@ -149,8 +149,8 @@ var pluginObj = {
 	
 	//message handling functions: handle PART
 	msgParsePART: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var channel = data[4]||data[3];
+		var nick = data[1][0];
+		var channel = data[4][0]||data[3][0];
 		var reason = data[5];
 		var parsedData = {rawdata: data, nick: nick, channel: channel, reason: reason};
 		if (!callback) {
@@ -162,8 +162,8 @@ var pluginObj = {
 	
 	//message handling functions: handle QUIT
 	msgParseQUIT: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var reason = data[5]||data[3];
+		var nick = data[1][0];
+		var reason = data[5]||data[4][0];
 		var channels = [];
 		for (var channel in ircChannelUsers) {
 			if (ircChannelUsers[channel][nick] !== undefined) {
@@ -180,8 +180,8 @@ var pluginObj = {
 	
 	//message handling functions: handle MODE
 	msgParseMODE: function(data, callback) {
-		var by = data[1].split('!')[0];
-		var modeParams = data[3].split(' ');
+		var by = data[1][0];
+		var modeParams = data[3];
 		var parsedData;
 		if (modeParams.length == 3) {
 			if(modeParams[1].charAt(0) == '+' || modeParams[1].charAt(0) == '-') {
@@ -207,8 +207,8 @@ var pluginObj = {
 	
 	//message handling functions: handle NICK
 	msgParseNICK: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var newnick = data[3];
+		var nick = data[1][0];
+		var newnick = data[5]||data[4][0];
 		var channels = [];
 		for (var channel in ircChannelUsers) {
 			if (ircChannelUsers[channel][nick] !== undefined) {
@@ -225,9 +225,9 @@ var pluginObj = {
 	
 	//message handling functions: handle KICK
 	msgParseKICK: function (data, callback) {
-		var by = data[1].split('!')[0];
-		var channel = data[3].split(' ')[0];
-		var nick = data[3].split(' ')[1];
+		var by = data[1][0];
+		var channel = data[4][0];
+		var nick = data[4][1];
 		var reason = data[5];
 		var parsedData = {rawdata: data, by: by, channel: channel, nick: nick, reason: reason};
 		if (!callback) {
@@ -239,8 +239,8 @@ var pluginObj = {
 	
 	//message handling functions: handle TOPIC
 	msgParseTOPIC: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var channel = data[3].split(' ')[0];
+		var nick = data[1][0];
+		var channel = data[4][0];
 		var topic = data[5];
 		var parsedData = {rawdata: data, nick: nick, channel: channel, topic: topic};
 		if (!callback) {
@@ -252,8 +252,8 @@ var pluginObj = {
 	
 	//message handling functions: handle KILL
 	msgParseKILL: function (data, callback) {
-		var nick = data[1].split('!')[0];
-		var reason = data[5]||data[3];
+		var nick = data[1][0];
+		var reason = data[5]||data[4][0];
 		var channels = [];
 		for (var channel in ircChannelUsers) {
 			if (ircChannelUsers[channel][nick] !== undefined) {
@@ -275,7 +275,7 @@ var pluginObj = {
 	//message handling functions: handle RPL_WHOISUSER
 	msgParseNum311: function (data, callback) {
 		var line;
-		var params = data[1][0][3].split(' ');
+		var params = data[1][0][3];
 		var parsedData = {
 			rawdata: data,
 			nick: params[1],
@@ -301,11 +301,11 @@ var pluginObj = {
 				parsedData.away = data[1][line][5];
 			}
 			if (data[1][line][2] == 317) {
-				parsedData.idle = data[1][line][4].split(' ')[2];
-				parsedData.signontime = data[1][line][4].split(' ')[3];
+				parsedData.idle = data[1][line][4][2];
+				parsedData.signontime = data[1][line][4][3];
 			}
 			if (data[1][line][2] == 312) {
-				parsedData.server = data[1][line][3].split(' ')[2];
+				parsedData.server = data[1][line][3][2];
 				parsedData.serverinfo = data[1][line][5];
 			}
 			if (data[1][line][2] == 313) {
@@ -326,7 +326,7 @@ var pluginObj = {
 		var params;
 		for (line in data[1]) {
 			if (data[1][line][2] == 352) {
-				params = data[1][line][3].split(' ');
+				params = data[1][line][3];
 				if (!parsedData[params[1]]) {parsedData[params[1]] = {};}
 				parsedData[params[1]][params[5]] = {
 					user: params[2],
@@ -335,7 +335,8 @@ var pluginObj = {
 					isHere: params[6].charAt(0) == 'H' ? true : false,
 					isGlobalOP: params[6].charAt(1) == '*' ? true : false,
 					mode: params[6].charAt(1) == '*' ? params[6].substr(2) : params[6].substr(1),
-					realname: data[1][line][5]
+					hopcount: data[1][line][5].split(' ')[0],
+					realname: data[1][line][5].split(' ').slice(1).join(' ')
 				};
 			}
 		}
