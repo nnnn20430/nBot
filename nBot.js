@@ -464,10 +464,18 @@ function initTerminalHandle() {
 				}
 			}else if (chunk == "\x7f") {
 				//backspace
-				terminalBuffer[terminalBufferCurrent]=terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-2))+terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
+				terminalBuffer[terminalBufferCurrent]=
+				terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-2))+
+				terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
 				if (terminalCursorPositionAbsolute > 1) {
 					terminalCursorPositionAbsolute--;
 				}
+				terminalUpdateBuffer();
+			}else if (chunk == "\x1b\x5b\x33\x7e") {
+				//del
+				terminalBuffer[terminalBufferCurrent]=
+				terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-1))+
+				terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute));
 				terminalUpdateBuffer();
 			}else if (chunk == "\x1b\x5b\x41") {
 				//up arrow
@@ -504,7 +512,12 @@ function initTerminalHandle() {
 				killAllnBotInstances('stdin received ^C');
 			}else{
 				chunk=chunk.replace(new RegExp('(\\x1b|\\x5b\\x42|\\x5b\\x41|\\x5b\\x44|\\x5b\\x43|\\x03|\\x18|\\x1a|\\x02|\\x01)', 'g'), '');
-				terminalBuffer[terminalBufferCurrent]=terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-1))+chunk+terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
+				
+				terminalBuffer[terminalBufferCurrent]=
+				terminalBuffer[terminalBufferCurrent].substr(0, (terminalCursorPositionAbsolute-1))+
+				chunk+
+				terminalBuffer[terminalBufferCurrent].substr((terminalCursorPositionAbsolute-1));
+				
 				terminalCursorPositionAbsolute+=chunk.length;
 				terminalUpdateBuffer();
 			}
@@ -801,7 +814,7 @@ function killAllnBotInstances(reason, force) {
 			if (connectionsTmp[connection] &&
 			!connectionsTmp[connection].ircConnection.destroyed) {
 				connectionsTmp[connection].ircConnection.write('QUIT :'+reason+'\r\n');
-			} else {
+			} else if (connectionsTmp[connection]) {
 				connectionsTmp[connection].kill();
 			}
 		}
