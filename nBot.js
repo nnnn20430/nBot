@@ -22,6 +22,7 @@
 //variables
 var http = require('http');
 var net = require('net');
+var tls = require('tls');
 var readline = require('readline');
 var fs = require('fs');
 var util = require('util');
@@ -68,6 +69,8 @@ var SettingsConstructor = {
 		this.ircServer = 'localhost';
 		this.ircServerPort = 6667;
 		this.ircServerPassword = '';
+		this.tls = false;
+		this.tlsRejectUnauthorized = false;
 		this.socks5_host = '';
 		this.socks5_port = 1080;
 		this.socks5_username = '';
@@ -1631,7 +1634,9 @@ function Create_nBot_instance(settings, globalSettings) {
 				port: settings.ircServerPort||6667,
 				nick: settings.botName||"bot",
 				pass: settings.ircServerPassword||"",
-				mode: settings.botMode||"0"
+				mode: settings.botMode||"0",
+				tls: settings.tls?true:false,
+				tlsRejectUnauthorized: settings.tlsRejectUnauthorized?true:false
 			};
 			for (var connectionInfoAttr in connectionInfoMod) {connectionInfo[connectionInfoAttr]=connectionInfoMod[connectionInfoAttr];}
 			function ircConnectionOnData(chunk) {
@@ -1653,8 +1658,10 @@ function Create_nBot_instance(settings, globalSettings) {
 				var c;
 				var connectionOptions = {
 					host: connectionInfo.host,
-					port: connectionInfo.port
+					port: connectionInfo.port,
+					rejectUnauthorized: connectionInfo.tlsRejectUnauthorized
 				};
+				var secure = connectionInfo.tls;
 				var socks5 = false;
 				function initSocks(host, port, user, pass, callback) {
 					var ipAddr;
@@ -1751,7 +1758,7 @@ function Create_nBot_instance(settings, globalSettings) {
 					connectionOptions.host = settings.socks5_host;
 					connectionOptions.port = settings.socks5_port;
 				}
-				c = net.connect(connectionOptions,
+				c = (secure?tls:net).connect(connectionOptions,
 					function() { //'connect' listener
 						if (socks5) {
 							initSocks(connectionInfo.host,

@@ -146,7 +146,7 @@ var pluginObj = {
 	
 	//misc plugin functions: authenticate user
 	authenticateOp: function (user, pass, ignorePass) {
-		var response = "Unknown error happened";
+		var response = "Error: Wrong username or password";
 		if (pluginObj.isOp(user, false) === true && pluginObj.isOp(user) === false) {
 			if(pass == pluginSettings.opUsers[user]  && pluginSettings.opUsers[user] !== ""){
 				response = "Success: Correct login";
