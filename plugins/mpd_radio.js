@@ -1,4 +1,4 @@
-// Copyright (C) 2015  nnnn20430 (nnnn20430@mindcraft.si.eu.org)
+// Copyright (C) 2015, 2016  nnnn20430 (nnnn20430@mindcraft.si.eu.org)
 //
 // This file is part of nBot.
 //
