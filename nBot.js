@@ -1804,7 +1804,10 @@ function Create_nBot_instance(settings, globalSettings) {
 		ircBotHost: ircBotHost,
 		ircChannelUsers: ircChannelUsers,
 		botFunctions: botF,
-		botVariables: botV
+		botVariables: botV,
+		externalObjects: {
+			instanceBotEventHandleObj: instanceBotEventHandleObj
+		}
 	};
 	this.pluginData = {};
 	
