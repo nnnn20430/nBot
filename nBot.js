@@ -69,6 +69,9 @@ var SettingsConstructor = {
 		this.ircServer = 'localhost';
 		this.ircServerPort = 6667;
 		this.ircServerPassword = '';
+		this.localBindAddress = null;
+		this.localBindPort = null;
+		this.ipFamily = 4;
 		this.tls = false;
 		this.tlsRejectUnauthorized = false;
 		this.socks5_host = '';
@@ -440,7 +443,9 @@ function initTerminalHandle() {
 	terminalBuffer = [""]; terminalBufferCurrent = 0; terminalBufferMax = 10; terminalCursorPositionAbsolute = 1; terminalBufferCurrentUnModifiedState = "";
 
 	process.stdin.setEncoding('utf8');
-	process.stdin.setRawMode(true);
+	if (process.stdin.setRawMode) {
+		process.stdin.setRawMode(true);
+	}
 	terminalUpdateBuffer();
 	
 	process.stdin.on('readable', function() {
@@ -1632,6 +1637,9 @@ function Create_nBot_instance(settings, globalSettings) {
 			var connectionInfo = {
 				host: settings.ircServer||"127.0.0.1",
 				port: settings.ircServerPort||6667,
+				localAddress: settings.localBindAddress||null,
+				localPort: settings.localBindPort||null,
+				ipFamily: settings.ipFamily||4,
 				nick: settings.botName||"bot",
 				pass: settings.ircServerPassword||"",
 				mode: settings.botMode||"0",
@@ -1659,6 +1667,9 @@ function Create_nBot_instance(settings, globalSettings) {
 				var connectionOptions = {
 					host: connectionInfo.host,
 					port: connectionInfo.port,
+					localAddress: connectionInfo.localAddress,
+					localPort: connectionInfo.localPort,
+					family: connectionInfo.ipFamily,
 					rejectUnauthorized: connectionInfo.tlsRejectUnauthorized
 				};
 				var secure = connectionInfo.tls;
