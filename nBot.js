@@ -101,7 +101,11 @@ function botSettingsLoad(file, callback) {
 			fs.readFile(file, {"encoding": "utf8"}, function (err, data) {
 				if (err) throw err;
 				if (callback !== undefined) {
-					callback(JSON.parse(data));
+					try {
+						callback(JSON.parse(data));
+					} catch (e) {
+						debugLog('Error happened when loading settings:\n'+e.stack);
+					}
 				}
 			});
 		} else if (err.code == "ENOENT"){

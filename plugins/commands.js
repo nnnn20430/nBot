@@ -350,7 +350,7 @@ var pluginObj = {
 				try {
 					pluginObj.commandsObject[command](data);
 				} catch (e) {
-					botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+pluginObj.getCommandOrigin(command)+'" is erroneous: ('+e+')');
+					botF.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+pluginObj.getCommandOrigin(command)+'" is erroneous:'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 				}
 			}
 		}
@@ -415,7 +415,7 @@ var pluginObj = {
 				dynamicFunction=eval("(function (data) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
 				dynamicFunction(data);
 			} catch (e) {
-				botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous: ('+e+')');
+				botF.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous:'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 			}
 		}
 	},

@@ -64,7 +64,7 @@ var pluginObj = {
 					try {
 						pluginObj.msgListenerObj[id][name][handle](data);
 					} catch (e) {
-						botF.debugMsg('Error when emitting "'+name+'" event to listener "'+id+'": ('+e+')');
+						botF.debugMsg('Error when emitting "'+name+'" event to listener "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 					}
 				}
 			}
