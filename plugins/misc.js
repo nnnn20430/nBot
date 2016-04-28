@@ -82,7 +82,7 @@ var pluginObj = {
 	//try if the message is artithmetic equation ending with a "=" char
 	tryArithmeticEquation: function (data) {
 		if (data.message.charAt(data.message.length-1) == '=') {
-			if (botF.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=|\.|\^)/g, ''))) {
+			if (botF.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=|\.|\^|\||\&)/g, ''))) {
 				data.message = data.message.replace(/([0-9]+)\*\*([0-9]+)/g, '(Math.pow($1,$2))');
 				try {
 					botF.ircSendCommandPRIVMSG('='+eval(data.message.substr(0, data.message.length-1)), data.responseTarget);

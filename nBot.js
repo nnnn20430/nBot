@@ -82,6 +82,7 @@ var SettingsConstructor = {
 		this.ircRelayServerEnabled = true;
 		this.ircResponseListenerLimit = 30;
 		this.ircMultilineMessageMaxLines = 300;
+		this.errorsIncludeStack = false;
 		this.pluginDir = './plugins';
 		this.plugins = [ 
 			'simpleMsg',
@@ -1063,7 +1064,7 @@ function Create_nBot_instance(settings, globalSettings) {
 			try {
 				nBotObject.botEventsEmitter.emit('botEvent', {eventName: name, eventData: data});
 			} catch (e) {
-				botF.debugMsg('Error when emitting "botEvent" event with name "'+name+'": ('+e+')');
+				botF.debugMsg('Error when emitting "botEvent" event with name "'+name+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 			}
 		},
 		
@@ -1079,7 +1080,7 @@ function Create_nBot_instance(settings, globalSettings) {
 						try {
 							nBotObject.pluginData[id].botEvent(data);
 						} catch (e) {
-							botF.debugMsg('Error happened when passing botEvent "'+data.eventName+'" to plugin "'+id+'": ('+e+')');
+							botF.debugMsg('Error happened when passing botEvent "'+data.eventName+'" to plugin "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 						}
 					}
 				});
@@ -1101,7 +1102,7 @@ function Create_nBot_instance(settings, globalSettings) {
 						delete require.cache[pluginPath];
 					}
 				} catch (e) {
-					botF.debugMsg('Error happened when loading plugin "'+id+'": ('+e+')');
+					botF.debugMsg('Error happened when loading plugin "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 				}
 			})();
 		},
@@ -1112,7 +1113,7 @@ function Create_nBot_instance(settings, globalSettings) {
 				botF.emitBotEvent('botPluginDisableEvent', id);
 				delete nBotObject.pluginData[id];
 			} catch (e) {
-				botF.debugMsg('Error happened when disabling plugin "'+id+'": ('+e+')');
+				botF.debugMsg('Error happened when disabling plugin "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 			}
 		},
 		
@@ -1163,11 +1164,11 @@ function Create_nBot_instance(settings, globalSettings) {
 									listenerObj.handle(data);
 									save = false;
 								} catch (e) {
-									botF.debugMsg('Error when emitting irc response command "'+command+'" event to listener "'+id+'": ('+e+')');
+									botF.debugMsg('Error when emitting irc response command "'+command+'" event to listener "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 								}
 							}
 						} catch (e) {
-							botF.debugMsg('Error checking irc response event condition for command "'+command+'" listener "'+id+'": ('+e+')');
+							botF.debugMsg('Error checking irc response event condition for command "'+command+'" listener "'+id+'":'+settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')'));
 						}
 					}
 					if (botF.isNumeric(listenerObj.ttl)) {
