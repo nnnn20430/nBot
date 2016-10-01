@@ -51,7 +51,7 @@ var SettingsConstructor = {
 		}
 		var attrname;
 		this.terminalSupportEnabled = true;
-		this.terminalInputPrefix = '>';
+		this.terminalInputPrefix = '> ';
 		this.ircRelayServerEnabled = true;
 		this.ircRelayServerPort = 9977;
 		this.debugMessages = false;
@@ -113,12 +113,7 @@ function botSettingsLoad(file, callback) {
 			});
 		} else if (err.code == "ENOENT"){
 			var newSettings = new SettingsConstructor.main({
-				connections: [new SettingsConstructor.connection({
-					channels: [
-						'#nBot',
-						'#mindcraft'
-					]
-				})]
+				connections: [new SettingsConstructor.connection({})]
 			});
 			fs.writeFile(file, JSON.stringify(newSettings, null, '\t'), function (err) {if (err) throw err; callback(newSettings);});
 		}
@@ -917,6 +912,9 @@ function nBotConnectionInit(connectionId) {
 	var options = botObj.publicData.options;
 	var botV = botObj.publicData.botVariables;
 	var botF = botObj.publicData.botFunctions;
+	
+	botF.botSettingsLoad = botSettingsLoad;
+	botF.botSettingsSave = botSettingsSave;
 	
 	botObj.publicData.externalObjects = {
 			instanceBotEventHandleObj: instanceBotEventHandleObj
