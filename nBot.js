@@ -85,7 +85,6 @@ var SettingsConstructor = {
 		this.ircResponseListenerLimit = 30;
 		this.ircMultilineMessageMaxLines = 300;
 		this.errorsIncludeStack = false;
-		this.debugMessages = false;
 		this.pluginDir = './plugins';
 		this.plugins = [ 
 			'simpleMsg',
@@ -828,7 +827,7 @@ function killAllnBotInstances(reason, force) {
 }
 
 //misc functions: handle irc bot event from bot instance
-var instanceBotEventHandleObj = {
+var botInstanceEventHandles = {
 	PRIVMSG: function (connection, data) {
 		var nick = data[1][0], 
 			to = data[4][0], 
@@ -876,10 +875,10 @@ function nBotConnectionInit(connectionId) {
 	function handleBotEvent(event) {
 		switch (event.eventName) {
 			case 'botReceivedPRIVMSG': 
-				instanceBotEventHandleObj.PRIVMSG(connectionId, event.eventData);
+				botInstanceEventHandles.PRIVMSG(connectionId, event.eventData);
 				break;
 			case 'botReceivedNOTICE':
-				instanceBotEventHandleObj.NOTICE(connectionId, event.eventData);
+				botInstanceEventHandles.NOTICE(connectionId, event.eventData);
 				break;
 			case 'botIrcConnectionRegistered':
 				handleConnectionRegistration();
@@ -913,12 +912,15 @@ function nBotConnectionInit(connectionId) {
 	var botV = botObj.publicData.botVariables;
 	var botF = botObj.publicData.botFunctions;
 	
+	//expose new variables
+	botV.botInstanceEventHandles = botInstanceEventHandles;
+	//expose new functions
 	botF.botSettingsLoad = botSettingsLoad;
 	botF.botSettingsSave = botSettingsSave;
 	
-	botObj.publicData.externalObjects = {
-			instanceBotEventHandleObj: instanceBotEventHandleObj
-	};
+	//listen for events
+	botObj.botEventsEmitter.on('botEvent', handleBotEvent);
+	botObj.botEventsEmitter.on('botDebugMessage', handleBotDebugMessage);
 	
 	//load plugins from settings
 	for (var plugin in connections[connectionId].plugins) {
@@ -927,9 +929,6 @@ function nBotConnectionInit(connectionId) {
 	}
 	
 	botObj.init();
-	
-	botObj.botEventsEmitter.on('botEvent', handleBotEvent);
-	botObj.botEventsEmitter.on('botDebugMessage', handleBotDebugMessage);
 }
 
 //load settings and start the bot
