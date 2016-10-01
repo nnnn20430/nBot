@@ -477,7 +477,7 @@ var pluginObj = {
 		nbot: function (data) {botF.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
 		help: function (data) {if(data.messageARGS[1] !== undefined){botF.ircSendCommandPRIVMSG(pluginObj.commandHelp("commandInfo", data.messageARGS[1]), data.responseTarget);}else{botF.ircSendCommandPRIVMSG(pluginObj.getHelp(), data.responseTarget);}},
 		away: function (data) {botF.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; userData = userData[data.responseTarget]; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} botF.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
-		userlist: function (data) {if (data.messageARGS[1] == 'update') {botF.ircUpdateUsersInChannel(data.responseTarget);} else if (data.messageARGS[1] == 'count') {botF.ircSendCommandPRIVMSG(Object.keys(botObj.publicData.ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = botObj.publicData.ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += botF.ircModePrefixConvert('prefix', channelUsersObj[user].mode)+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; botF.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
+		userlist: function (data) {if (data.messageARGS[1] == 'update') {botF.ircUpdateUsersInChannel(data.responseTarget);} else if (data.messageARGS[1] == 'count') {botF.ircSendCommandPRIVMSG(Object.keys(ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += botF.ircModePrefixConvert('prefix', channelUsersObj[user].mode)+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; botF.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
 		origin: function (data) {if (pluginObj.commandsObject[data.messageARGS[1]] !== undefined) {botF.ircSendCommandPRIVMSG('Command "'+data.messageARGS[1]+'" is from plugin "'+pluginObj.getCommandOrigin(data.messageARGS[1])+'"', data.responseTarget);}},
 		raw: function (data) {if(pluginObj.isOp(data.nick) === true) {botObj.ircConnection.write(data.messageARGS[1]+'\r\n');}},
 		savesettings: function (data) {if(pluginObj.isOp(data.nick) === true) {botF.botSettingsSave(null, null, function () {botF.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
@@ -540,9 +540,9 @@ module.exports.main = function (passedData) {
 	pluginId = passedData.id;
 	botF = botObj.publicData.botFunctions;
 	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.settings;
+	settings = botObj.publicData.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = botObj.publicData.ircChannelUsers;
+	ircChannelUsers = botV.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
