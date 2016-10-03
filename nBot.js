@@ -356,7 +356,7 @@ function terminalProcessInput(chunk) {
 						connections = settings.connections;
 						function pluginReload(botObj, plugin) {
 							var botF = botObj.publicData.botFunctions;
-							var settings = botObj.publicData.settings;
+							var settings = botObj.publicData.options;
 							botF.botPluginDisable(plugin);
 							botF.botPluginLoad(plugin, settings.pluginDir+'/'+plugin+'.js');
 						}
