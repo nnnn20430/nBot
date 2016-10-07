@@ -20,10 +20,8 @@
 
 "use strict";
 //reserved nBot variables
-var botObj;
+var bot;
 var pluginId;
-var botF;
-var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -53,7 +51,7 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var pluginObj = {
+var plugin = {
 	//misc plugin functions
 	
 	//misc plugin functions: radio status
@@ -125,41 +123,41 @@ var pluginObj = {
 	
 	//check if plugin is ready
 	pluginReadyCheck: function () {
-		if (botObj.pluginData.commands &&
-		botObj.pluginData.commands.ready) {
+		if (bot.plugins.commands &&
+		bot.plugins.commands.ready) {
 			//plugin is ready
 			exports.ready = true;
-			botF.emitBotEvent('botPluginReadyEvent', pluginId);
+			bot.emitBotEvent('botPluginReadyEvent', pluginId);
 		}
 	},
 	
 	//add commands to commands plugin
 	utilizeCommands: function () {
-		var commandsPlugin = botObj.pluginData.commands.plugin;
+		var commandsPlugin = bot.plugins.commands.plugin;
 		commandsPlugin.commandAdd('np', function (data) {
-			pluginObj.getNowPlaying(function (response) {
-				botF.ircSendCommandPRIVMSG(response, data.responseTarget);
+			plugin.getNowPlaying(function (response) {
+				bot.ircSendCommandPRIVMSG(response, data.responseTarget);
 			});
 		}, 'np: shows currently playing song on the radio', pluginId);
 		
 		commandsPlugin.commandAdd('mpd_play', function (data) {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
-				pluginObj.mpdSendCommand('play '+(+data.messageARGS[1]-1));
-				botF.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
+				plugin.mpdSendCommand('play '+(+data.messageARGS[1]-1));
+				bot.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
 			}
 		}, 'mpd_play "pos": plays the song at position', pluginId);
 		
 		commandsPlugin.commandAdd('mpd_random', function (data) {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
-				pluginObj.mpdSendCommand('random '+data.messageARGS[1]);
-				botF.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
+				plugin.mpdSendCommand('random '+data.messageARGS[1]);
+				bot.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
 			}
 		}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
 		
 		commandsPlugin.commandAdd('mpd_prio', function (data) {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
-				pluginObj.mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
-				botF.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
+				plugin.mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
+				bot.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
 			}
 		}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pluginId);
 		
@@ -167,16 +165,16 @@ var pluginObj = {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
 					var pos = +data.messageARGS[1]-1, endpos = +data.messageARGS[2], prio = 255;
 					if (!data.messageARGS[2]) {
-						pluginObj.mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
-						botF.ircSendCommandPRIVMSG('mpd: Song queued', data.responseTarget);
+						plugin.mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
+						bot.ircSendCommandPRIVMSG('mpd: Song queued', data.responseTarget);
 					} else {
 						var commandString = 'random 0\nrandom 1\nprio 0 -1';
 						while (pos < endpos && prio > 0) {
 							commandString += '\nprio '+prio+' '+pos;
 							pos++; prio--;
 						}
-						pluginObj.mpdSendCommand(commandString);
-						botF.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
+						plugin.mpdSendCommand(commandString);
+						bot.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 					}
 			}
 		}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
@@ -191,23 +189,23 @@ var pluginObj = {
 						prio--;
 					}
 					console.log(commandString);
-					pluginObj.mpdSendCommand(commandString);
-					botF.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
+					plugin.mpdSendCommand(commandString);
+					bot.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 			}
 		}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pluginId);
 		
 		commandsPlugin.commandAdd('mpd_raw', function (data) {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
-				pluginObj.mpdSendCommand(data.messageARGS[1]);
+				plugin.mpdSendCommand(data.messageARGS[1]);
 			}
 		}, 'mpd_raw "command": send command to mpd)', pluginId);
 		
-		pluginObj.pluginReadyCheck();
+		plugin.pluginReadyCheck();
 	}
 };
 
 //export functions
-module.exports.plugin = pluginObj;
+module.exports.plugin = plugin;
 module.exports.ready = false;
 
 //reserved functions
@@ -215,31 +213,29 @@ module.exports.ready = false;
 //reserved functions: handle "botEvent" from bot (botEvent is used for irc related activity)
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
-		case 'botPluginReadyEvent': if (event.eventData == 'commands') {pluginObj.utilizeCommands();} break;
+		case 'botPluginReadyEvent': if (event.eventData == 'commands') {plugin.utilizeCommands();} break;
 	}
 };
 
 //reserved functions: main function called when plugin is loaded
-module.exports.main = function (passedData) {
+module.exports.main = function (i, b) {
 	//update variables
-	botObj = passedData.botObj;
-	pluginId = passedData.id;
-	botF = botObj.publicData.botFunctions;
-	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.options;
-	pluginSettings = settings.pluginsSettings[passedData.id];
-	ircChannelUsers = botV.ircChannelUsers;
+	bot = b;
+	pluginId = i;
+	settings = bot.options;
+	pluginSettings = settings.pluginsSettings[pluginId];
+	ircChannelUsers = bot.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
 		pluginSettings = new SettingsConstructor();
-		settings.pluginsSettings[passedData.id] = pluginSettings;
-		botF.botSettingsSave();
+		settings.pluginsSettings[pluginId] = pluginSettings;
+		bot.botSettingsSave();
 	}
 	
 	//check and utilize dependencies
-	if (botObj.pluginData.commands &&
-	botObj.pluginData.commands.ready) {
-		pluginObj.utilizeCommands();
+	if (bot.plugins.commands &&
+	bot.plugins.commands.ready) {
+		plugin.utilizeCommands();
 	}
 };

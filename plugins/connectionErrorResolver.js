@@ -20,10 +20,8 @@
 
 "use strict";
 //reserved nBot variables
-var botObj;
+var bot;
 var pluginId;
-var botF;
-var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -41,7 +39,7 @@ var vm = require('vm');
 var pluginDisabled = false;
 
 //main plugin object
-var pluginObj = {
+var plugin = {
 	handleNewConnection: function (ircConnection) {
 		ircConnection.setTimeout(60*1000);
 		ircConnection.once('error', function (e) {
@@ -59,7 +57,7 @@ var pluginObj = {
 		ircConnection.once('close', function() {
 			if (!pluginDisabled) {
 				setTimeout(function() {
-					if (!pluginDisabled) {botF.initIrcBot();}
+					if (!pluginDisabled) {bot.init();}
 				}, 3000);
 			}
 		});
@@ -67,7 +65,7 @@ var pluginObj = {
 };
 
 //exports
-module.exports.plugin = pluginObj;
+module.exports.plugin = plugin;
 module.exports.ready = false;
 
 //reserved functions
@@ -75,23 +73,21 @@ module.exports.ready = false;
 //reserved functions: handle "botEvent" from bot (botEvent is used for irc related activity)
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
-		case 'botIrcConnectionCreated': pluginObj.handleNewConnection(event.eventData); break;
+		case 'botIrcConnectionCreated': plugin.handleNewConnection(event.eventData); break;
 		case 'botPluginDisableEvent': if (event.eventData == pluginId) {pluginDisabled = true;} break;
 	}
 };
 
 //reserved functions: main function called when plugin is loaded
-module.exports.main = function (passedData) {
+module.exports.main = function (i, b) {
 	//update variables
-	botObj = passedData.botObj;
-	pluginId = passedData.id;
-	botF = botObj.publicData.botFunctions;
-	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.options;
+	bot = b;
+	pluginId = i;
+	settings = bot.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = botV.ircChannelUsers;
+	ircChannelUsers = bot.ircChannelUsers;
 	
 	//plugin is ready
 	exports.ready = true;
-	botF.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pluginId);
 };

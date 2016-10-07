@@ -20,10 +20,8 @@
 
 "use strict";
 //reserved nBot variables
-var botObj;
+var bot;
 var pluginId;
-var botF;
-var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -57,7 +55,7 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var pluginObj = {
+var plugin = {
 	//variables
 	birthdaysRemindCheckTrackerObj: {},
 	channelMessageStatisticsObj: {},
@@ -66,28 +64,28 @@ var pluginObj = {
 	
 	//initialize enabled misc features
 	miscFeatureInit: function () {
-		if (pluginSettings.birthdays) {pluginObj.birthdaysInit();}
-		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsInit();}
-		if (pluginSettings.hostnameHistory) {pluginObj.hostnameHistoryInit();}
+		if (pluginSettings.birthdays) {plugin.birthdaysInit();}
+		if (pluginSettings.statistics) {plugin.channelMessageStatisticsInit();}
+		if (pluginSettings.hostnameHistory) {plugin.hostnameHistoryInit();}
 	},
 	
 	//pass messages to enabled features
 	mainMiscMsgHandle: function (data) {
-		if (pluginSettings.mathHelper) {pluginObj.tryArithmeticEquation(data);}
-		if (pluginSettings.birthdays && pluginSettings.birthdaysRemindOnActivity) {pluginObj.birthdaysRemindCheck(data);}
-		if (pluginSettings.statistics) {pluginObj.channelMessageStatisticsTrack(data);}
-		if (pluginSettings.hostnameHistory) {pluginObj.hostnameHistoryTrack(data);}
+		if (pluginSettings.mathHelper) {plugin.tryArithmeticEquation(data);}
+		if (pluginSettings.birthdays && pluginSettings.birthdaysRemindOnActivity) {plugin.birthdaysRemindCheck(data);}
+		if (pluginSettings.statistics) {plugin.channelMessageStatisticsTrack(data);}
+		if (pluginSettings.hostnameHistory) {plugin.hostnameHistoryTrack(data);}
 	},
 	
 	//try if the message is artithmetic equation ending with a "=" char
 	tryArithmeticEquation: function (data) {
 		if (data.message.charAt(data.message.length-1) == '=') {
-			if (botF.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=|\.|\^|\||\&)/g, ''))) {
+			if (bot.isNumeric(data.message.replace(/(\+|\-|\/|\*|\%|\(|\)|\=|\.|\^|\||\&)/g, ''))) {
 				data.message = data.message.replace(/([0-9]+)\*\*([0-9]+)/g, '(Math.pow($1,$2))');
 				try {
-					botF.ircSendCommandPRIVMSG('='+eval(data.message.substr(0, data.message.length-1)), data.responseTarget);
+					bot.ircSendCommandPRIVMSG('='+eval(data.message.substr(0, data.message.length-1)), data.responseTarget);
 				} catch (e) {
-					botF.ircSendCommandPRIVMSG('Error when evaluating equation: ('+e+')', data.responseTarget);
+					bot.ircSendCommandPRIVMSG('Error when evaluating equation: ('+e+')', data.responseTarget);
 				}
 			}
 		}
@@ -167,7 +165,7 @@ var pluginObj = {
 	//birthdays feature init
 	birthdaysInit: function () {
 		//add commands to commands plugin
-		var commandsPlugin = botObj.pluginData.commands.plugin;
+		var commandsPlugin = bot.plugins.commands.plugin;
 		commandsPlugin.commandAdd('bday', function (data) {
 			var user = data.messageARGS[1];
 			var bdaySec, bday, nextbday, nextbdayString, bdayIsToday = false;
@@ -180,11 +178,11 @@ var pluginObj = {
 				} else {
 					nextbday = Math.round(new Date(bday).setFullYear(new Date().getFullYear()+1)/1000);
 				}
-				nextbdayString = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(nextbday-date));
+				nextbdayString = plugin.parsedSecondsToString(plugin.parseSeconds(nextbday-date));
 				if ((bday.getMonth() === new Date().getMonth()) && (bday.getDate() == new Date().getDate())) {
 					bdayIsToday = true;
 				}
-				botF.ircSendCommandPRIVMSG('Born on: '+bday.getFullYear()+' '+(bday.getMonth() + 1)+' '+bday.getDate()+', next birthday in: '+nextbdayString+', birthday today: '+(bdayIsToday?'yes':'no')+'.', data.responseTarget);
+				bot.ircSendCommandPRIVMSG('Born on: '+bday.getFullYear()+' '+(bday.getMonth() + 1)+' '+bday.getDate()+', next birthday in: '+nextbdayString+', birthday today: '+(bdayIsToday?'yes':'no')+'.', data.responseTarget);
 			}
 		}, 'bday "user": get date of known users birthday', pluginId);
 		
@@ -192,7 +190,7 @@ var pluginObj = {
 			if (commandsPlugin.isOp(data.nick) || !pluginSettings.birthdaysCommandsOpOnly) {
 				var user = data.messageARGS[1];
 				var date = new Date(data.messageARGS[2]);
-				if (botF.isNumeric(date.getTime())) {
+				if (bot.isNumeric(date.getTime())) {
 					pluginSettings.birthdayData[user] = Math.round(date.getTime()/1000);
 				}
 			}
@@ -212,7 +210,7 @@ var pluginObj = {
 			for (var user in pluginSettings.birthdayData) {
 				bdayUserList+="\""+user+"\", ";
 			}
-			botF.ircSendCommandPRIVMSG("Known users are: "+bdayUserList.replace(/, $/, ".").replace(/^$/, 'No known users.'), data.responseTarget);
+			bot.ircSendCommandPRIVMSG("Known users are: "+bdayUserList.replace(/, $/, ".").replace(/^$/, 'No known users.'), data.responseTarget);
 		}, 'bdayuserlist: list known birthday users', pluginId);
 		
 		commandsPlugin.commandAdd('age', function (data) {
@@ -221,8 +219,8 @@ var pluginObj = {
 			var dateSec = Math.round(new Date().getTime()/1000);
 			if (pluginSettings.birthdayData[user]) {
 				bdaySec = +pluginSettings.birthdayData[user];
-				age = pluginObj.parsedSecondsToString(pluginObj.parseSeconds(dateSec-bdaySec));
-				botF.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
+				age = plugin.parsedSecondsToString(plugin.parseSeconds(dateSec-bdaySec));
+				bot.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 			}
 		}, 'age "user": known users age', pluginId);
 	},
@@ -234,16 +232,16 @@ var pluginObj = {
 			bdaySec = +pluginSettings.birthdayData[user];
 			bday = new Date(); bday.setTime(bdaySec*1000);
 			if ((bday.getMonth() === new Date().getMonth()) && (bday.getDate() == new Date().getDate())) {
-				if (!pluginObj.birthdaysRemindCheckTrackerObj[user]) {
-					pluginObj.birthdaysRemindCheckTrackerObj[user] = {};
+				if (!plugin.birthdaysRemindCheckTrackerObj[user]) {
+					plugin.birthdaysRemindCheckTrackerObj[user] = {};
 				}
-				if (!pluginObj.birthdaysRemindCheckTrackerObj[user][data.responseTarget]) {
-					botF.ircSendCommandPRIVMSG('Today is "'+user+'" birthday', data.responseTarget);
-					pluginObj.birthdaysRemindCheckTrackerObj[user][data.responseTarget] = true;
+				if (!plugin.birthdaysRemindCheckTrackerObj[user][data.responseTarget]) {
+					bot.ircSendCommandPRIVMSG('Today is "'+user+'" birthday', data.responseTarget);
+					plugin.birthdaysRemindCheckTrackerObj[user][data.responseTarget] = true;
 				}
-			} else if (pluginObj.birthdaysRemindCheckTrackerObj[user] &&
-				pluginObj.birthdaysRemindCheckTrackerObj[user][data.responseTarget]) {
-				delete pluginObj.birthdaysRemindCheckTrackerObj[user][data.responseTarget];
+			} else if (plugin.birthdaysRemindCheckTrackerObj[user] &&
+				plugin.birthdaysRemindCheckTrackerObj[user][data.responseTarget]) {
+				delete plugin.birthdaysRemindCheckTrackerObj[user][data.responseTarget];
 			}
 		}
 	},
@@ -251,9 +249,9 @@ var pluginObj = {
 	//channel message statistics init
 	channelMessageStatisticsInit: function () {
 		//add commands to commands plugin
-		var commandsPlugin = botObj.pluginData.commands.plugin;
+		var commandsPlugin = bot.plugins.commands.plugin;
 		commandsPlugin.commandAdd('msgstat', function (data) {
-			var i, sum = 0, message = '', channel = data.to, statsObj = pluginObj.channelMessageStatisticsObj[channel], statsArray = [];
+			var i, sum = 0, message = '', channel = data.to, statsObj = plugin.channelMessageStatisticsObj[channel], statsArray = [];
 			for (i in statsObj) {
 				statsArray.arrayValueAdd([i, statsObj[i]]);
 				sum += +statsObj[i];
@@ -263,20 +261,20 @@ var pluginObj = {
 				message += statsArray[i][0]+'('+Math.ceil(((statsArray[i][1]/sum)*100)*100)/100+'%), ';
 			}
 			if (message) {
-				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
+				bot.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
 			}
 		}, 'msgstat: prints users percentage of messages in channel', pluginId);
 	},
 	
 	//channel message statistics
 	channelMessageStatisticsTrack: function (data) {
-		if (!pluginObj.channelMessageStatisticsObj[data.to]) {
-			pluginObj.channelMessageStatisticsObj[data.to] = {};
+		if (!plugin.channelMessageStatisticsObj[data.to]) {
+			plugin.channelMessageStatisticsObj[data.to] = {};
 		}
-		if (!pluginObj.channelMessageStatisticsObj[data.to][data.nick]) {
-			pluginObj.channelMessageStatisticsObj[data.to][data.nick] = 0;
+		if (!plugin.channelMessageStatisticsObj[data.to][data.nick]) {
+			plugin.channelMessageStatisticsObj[data.to][data.nick] = 0;
 		}
-		pluginObj.channelMessageStatisticsObj[data.to][data.nick]++;
+		plugin.channelMessageStatisticsObj[data.to][data.nick]++;
 	},
 	
 	//send wake on lan magic packet with a mac addres on local broadcast
@@ -536,7 +534,7 @@ var pluginObj = {
 	leapYearRange: function (start, end) {
 		var leapYears = [];
 		for (var i = start; i <= end; i++) {
-			if (pluginObj.isLeapYear(i)) {
+			if (plugin.isLeapYear(i)) {
 				leapYears.push(i);
 			}
 		}
@@ -545,15 +543,15 @@ var pluginObj = {
 	
 	//hostname history feature init
 	hostnameHistoryInit: function () {
-		var commandsPlugin = botObj.pluginData.commands.plugin;
+		var commandsPlugin = bot.plugins.commands.plugin;
 		commandsPlugin.commandAdd('hosthistory', function (data) {
-			var hostHistoryData = pluginObj.hostHistoryData;
+			var hostHistoryData = plugin.hostHistoryData;
 			var message = 'Known nicknames for host: ';
 			for (var nick in hostHistoryData[data.messageARGS[1]]) {
 				message += hostHistoryData[data.messageARGS[1]][nick]+', ';
 			}
 			if (message != 'Known nicknames for host: ') {
-				botF.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
+				bot.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
 			}
 		}, 'hosthistory "hostname": prints list of known nicknames associated with the hostname', pluginId);
 	},
@@ -561,7 +559,7 @@ var pluginObj = {
 	//keep track of hostnames
 	hostnameHistoryTrack: function (data) {
 		var hostname = data.rawdata[0].split(' ')[0].split('@')[1];
-		var hostHistoryData = pluginObj.hostHistoryData;
+		var hostHistoryData = plugin.hostHistoryData;
 		var nickKnown = false;
 		if (hostHistoryData[hostname] === undefined) {
 			hostHistoryData[hostname] = [];
@@ -579,80 +577,80 @@ var pluginObj = {
 	//check if plugin is ready
 	pluginReadyCheck: function () {
 		if (
-		(botObj.pluginData.simpleMsg &&
-		botObj.pluginData.simpleMsg.ready) &&
-		(botObj.pluginData.commands &&
-		botObj.pluginData.commands.ready)
+		(bot.plugins.simpleMsg &&
+		bot.plugins.simpleMsg.ready) &&
+		(bot.plugins.commands &&
+		bot.plugins.commands.ready)
 		) {
 			//plugin is ready
 			exports.ready = true;
-			botF.emitBotEvent('botPluginReadyEvent', pluginId);
+			bot.emitBotEvent('botPluginReadyEvent', pluginId);
 		}
 	},
 	
 	//add listeners to simpleMsg plugin
 	utilizeSimpleMsg: function () {
-		var simpleMsg = botObj.pluginData.simpleMsg.plugin;
+		var simpleMsg = bot.plugins.simpleMsg.plugin;
 		simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
-			pluginObj.mainMiscMsgHandle(data);
+			plugin.mainMiscMsgHandle(data);
 		});
 		
 		simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
-			if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
-				delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+			if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
+				delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 			}
 		});
 		
 		simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
 			for (var i in data.channels) {
-				if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
-					delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+				if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+					delete plugin.channelMessageStatisticsObj[data.channels[i]][data.nick];
 				}
 			}
 		});
 		
 		simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
 			for (var i in data.channels) {
-				if (pluginObj.channelMessageStatisticsObj[data.channels[i]] && pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
-					pluginObj.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
-					delete pluginObj.channelMessageStatisticsObj[data.channels[i]][data.nick];
+				if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
+					plugin.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  plugin.channelMessageStatisticsObj[data.channels[i]][data.nick];
+					delete plugin.channelMessageStatisticsObj[data.channels[i]][data.nick];
 				}
 			}
 		});
 		
 		simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
-			if (pluginObj.channelMessageStatisticsObj[data.channel] && pluginObj.channelMessageStatisticsObj[data.channel][data.nick]) {
-				delete pluginObj.channelMessageStatisticsObj[data.channel][data.nick];
+			if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
+				delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 			}
 		});
 		
-		pluginObj.pluginReadyCheck();
+		plugin.pluginReadyCheck();
 	},
 	
 	//add commands to commands plugin
 	utilizeCommands: function () {
-		var commandsPlugin = botObj.pluginData.commands.plugin;
+		var commandsPlugin = bot.plugins.commands.plugin;
 		commandsPlugin.commandAdd('parseseconds', function (data) {
-			var parsedTime = pluginObj.parseSeconds(data.messageARGS[1]);
-			botF.ircSendCommandPRIVMSG(pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
+			var parsedTime = plugin.parseSeconds(data.messageARGS[1]);
+			bot.ircSendCommandPRIVMSG(plugin.parsedSecondsToString(parsedTime), data.responseTarget);
 		}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
 		
 		commandsPlugin.commandAdd('parsetime', function (data) {
-			var parsedTime = pluginObj.parseTimeToSeconds(data.messageARGS[1]);
-			botF.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
+			var parsedTime = plugin.parseTimeToSeconds(data.messageARGS[1]);
+			bot.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
 		}, 'parsetime "time": parse "y d h m s" to seconds', pluginId);
 		
 		commandsPlugin.commandAdd('sendwol', function (data) {
-			pluginObj.sendWoL(data.messageARGS[1], data.messageARGS[2]);
+			plugin.sendWoL(data.messageARGS[1], data.messageARGS[2]);
 		}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
 		
 		commandsPlugin.commandAdd('convert', function (data) {
 			var convertedValue;
-			botF.ircSendCommandPRIVMSG((convertedValue = pluginObj.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
+			bot.ircSendCommandPRIVMSG((convertedValue = plugin.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
 		}, 'convert "from" "to" "value": convert value to another', pluginId);
 		
 		commandsPlugin.commandAdd('1337', function (data) {
-			botF.ircSendCommandPRIVMSG(pluginObj.strTo1337(data.messageARGS[1]), data.responseTarget);
+			bot.ircSendCommandPRIVMSG(plugin.strTo1337(data.messageARGS[1]), data.responseTarget);
 		}, '1337 "text": convert text to 1337 text', pluginId);
 		
 		commandsPlugin.commandAdd('countdown', function (data) {
@@ -664,25 +662,25 @@ var pluginObj = {
 			switch (data.messageARGS[1].toUpperCase()) {
 				case 'SET':
 					timeoutId = setTimeout(function () {
-						botF.ircSendCommandPRIVMSG('Countdown "'+data.messageARGS[2]+'" finished.', data.responseTarget);
-						delete pluginObj.countdownDataObj[data.messageARGS[2]];
+						bot.ircSendCommandPRIVMSG('Countdown "'+data.messageARGS[2]+'" finished.', data.responseTarget);
+						delete plugin.countdownDataObj[data.messageARGS[2]];
 					}, data.messageARGS[3]*1000);
-					pluginObj.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
+					plugin.countdownDataObj[data.messageARGS[2]] = [timeoutId, date+(+data.messageARGS[3])];
 					break;
 				case 'REMOVE':
-					clearTimeout(pluginObj.countdownDataObj[data.messageARGS[2]][0]);
-					delete pluginObj.countdownDataObj[data.messageARGS[2]];
+					clearTimeout(plugin.countdownDataObj[data.messageARGS[2]][0]);
+					delete plugin.countdownDataObj[data.messageARGS[2]];
 					break;
 				case 'LIST':
-					for (i in pluginObj.countdownDataObj) {
+					for (i in plugin.countdownDataObj) {
 						response += '"'+i+'", ';
 					}
-					botF.ircSendCommandPRIVMSG('Current countdowns: '+response.replace(/, $/, ".").replace(/^$/, 'No running countdowns.'), data.responseTarget);
+					bot.ircSendCommandPRIVMSG('Current countdowns: '+response.replace(/, $/, ".").replace(/^$/, 'No running countdowns.'), data.responseTarget);
 					break;
 				case 'SHOW':
-					parsedTime = pluginObj.parseSeconds(pluginObj.countdownDataObj[data.messageARGS[2]][1]-date);
-					console.log(pluginObj.countdownDataObj[data.messageARGS[2]][1]+' '+date);
-					botF.ircSendCommandPRIVMSG('Time left: '+pluginObj.parsedSecondsToString(parsedTime), data.responseTarget);
+					parsedTime = plugin.parseSeconds(plugin.countdownDataObj[data.messageARGS[2]][1]-date);
+					console.log(plugin.countdownDataObj[data.messageARGS[2]][1]+' '+date);
+					bot.ircSendCommandPRIVMSG('Time left: '+plugin.parsedSecondsToString(parsedTime), data.responseTarget);
 					break;
 			}
 		}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
@@ -690,24 +688,24 @@ var pluginObj = {
 		commandsPlugin.commandAdd('reverse', function (data) {
 			var txt = data.messageARGS[1], txtr = ''; 
 			var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
-			botF.ircSendCommandPRIVMSG(txtr, data.responseTarget);
+			bot.ircSendCommandPRIVMSG(txtr, data.responseTarget);
 		}, 'reverse "text": reverse text', pluginId);
 		
 		commandsPlugin.commandAdd('randomnumber', function (data) {
-			botF.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
+			bot.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
 		}, 'randomnumber "min" "max": print random number', pluginId);
 		
 		commandsPlugin.commandAdd('uptime', function (data) {
-			var upTime = pluginObj.parseSeconds(Math.round(process.uptime()));
-			botF.ircSendCommandPRIVMSG('Uptime: '+pluginObj.parsedSecondsToString(upTime), data.responseTarget);
+			var upTime = plugin.parseSeconds(Math.round(process.uptime()));
+			bot.ircSendCommandPRIVMSG('Uptime: '+plugin.parsedSecondsToString(upTime), data.responseTarget);
 		}, 'uptime: print time passed since nBot process was started', pluginId);
 		
-		pluginObj.pluginReadyCheck();
+		plugin.pluginReadyCheck();
 	}
 };
 
 //exports
-module.exports.plugin = pluginObj;
+module.exports.plugin = plugin;
 module.exports.ready = false;
 
 //reserved functions
@@ -717,49 +715,47 @@ module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
 			(function () {
-				for (var countdown in pluginObj.countdownDataObj) {
-					clearTimeout(pluginObj.countdownDataObj[countdown][0]);
-					delete pluginObj.countdownDataObj[countdown];
+				for (var countdown in plugin.countdownDataObj) {
+					clearTimeout(plugin.countdownDataObj[countdown][0]);
+					delete plugin.countdownDataObj[countdown];
 				}
 			})();
 			break;
 		case 'botPluginReadyEvent':
 			switch (event.eventData) {
-				case 'simpleMsg': pluginObj.utilizeSimpleMsg(); break;
-				case 'commands': pluginObj.utilizeCommands(); break;
+				case 'simpleMsg': plugin.utilizeSimpleMsg(); break;
+				case 'commands': plugin.utilizeCommands(); break;
 			}
 			break;
 	}
 };
 
 //reserved functions: main function called when plugin is loaded
-module.exports.main = function (passedData) {
+module.exports.main = function (i, b) {
 	//update variables
-	botObj = passedData.botObj;
-	pluginId = passedData.id;
-	botF = botObj.publicData.botFunctions;
-	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.options;
+	bot = b;
+	pluginId = i;
+	settings = bot.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = botV.ircChannelUsers;
+	ircChannelUsers = bot.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
 		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[pluginId] = pluginSettings;
-		botF.botSettingsSave();
+		bot.botSettingsSave();
 	}
 	
 	//call main feature controlling function
-	pluginObj.miscFeatureInit();
+	plugin.miscFeatureInit();
 	
 	//check and utilize dependencies
-	if (botObj.pluginData.simpleMsg &&
-	botObj.pluginData.simpleMsg.ready) {
-		pluginObj.utilizeSimpleMsg();
+	if (bot.plugins.simpleMsg &&
+	bot.plugins.simpleMsg.ready) {
+		plugin.utilizeSimpleMsg();
 	}
-	if (botObj.pluginData.commands &&
-	botObj.pluginData.commands.ready) {
-		pluginObj.utilizeCommands();
+	if (bot.plugins.commands &&
+	bot.plugins.commands.ready) {
+		plugin.utilizeCommands();
 	}
 };

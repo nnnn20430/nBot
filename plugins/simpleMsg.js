@@ -20,10 +20,8 @@
 
 "use strict";
 //reserved nBot variables
-var botObj;
+var bot;
 var pluginId;
-var botF;
-var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -50,7 +48,7 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var pluginObj = {
+var plugin = {
 	//variables
 	msgListenerObj: {},
 	
@@ -58,13 +56,13 @@ var pluginObj = {
 	
 	//simple message event managing functions: emit
 	msgEmit: function (name, data) {
-		for (var id in pluginObj.msgListenerObj) {
-			if (pluginObj.msgListenerObj[id][name] !== undefined) {
-				for (var handle in pluginObj.msgListenerObj[id][name]) {
+		for (var id in plugin.msgListenerObj) {
+			if (plugin.msgListenerObj[id][name] !== undefined) {
+				for (var handle in plugin.msgListenerObj[id][name]) {
 					try {
-						pluginObj.msgListenerObj[id][name][handle](data);
+						plugin.msgListenerObj[id][name][handle](data);
 					} catch (e) {
-						botF.debugMsg('Error when emitting "'+name+'" event to listener "'+id+'":'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
+						bot.debugMsg('Error when emitting "'+name+'" event to listener "'+id+'":'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
 					}
 				}
 			}
@@ -75,9 +73,9 @@ var pluginObj = {
 	msgListenerAdd: function (id, name, handle) {
 		var response = false;
 		if ((id && name && handle) !== undefined) {
-			if (pluginObj.msgListenerObj[id] === undefined) {pluginObj.msgListenerObj[id] = {};}
-			if (pluginObj.msgListenerObj[id][name] === undefined) {pluginObj.msgListenerObj[id][name] = [];}
-			pluginObj.msgListenerObj[id][name].arrayValueAdd(handle);
+			if (plugin.msgListenerObj[id] === undefined) {plugin.msgListenerObj[id] = {};}
+			if (plugin.msgListenerObj[id][name] === undefined) {plugin.msgListenerObj[id][name] = [];}
+			plugin.msgListenerObj[id][name].arrayValueAdd(handle);
 			response = true;
 		}
 		return response;
@@ -86,19 +84,19 @@ var pluginObj = {
 	//simple message event managing functions: remove listener
 	msgListenerRemove: function (id, name, handle) {
 		var response = false;
-		if (pluginObj.msgListenerObj[id] !== undefined) {
+		if (plugin.msgListenerObj[id] !== undefined) {
 			if (name !== undefined) {
 				if (handle !== undefined) {
-					for (var handleFound in pluginObj.msgListenerObj[id][name]) {
-						if (handle === pluginObj.msgListenerObj[id][name][handleFound]) {
-							pluginObj.msgListenerObj[id][name].splice(handleFound, 1);
+					for (var handleFound in plugin.msgListenerObj[id][name]) {
+						if (handle === plugin.msgListenerObj[id][name][handleFound]) {
+							plugin.msgListenerObj[id][name].splice(handleFound, 1);
 						}
 					}
 				} else {
-					delete pluginObj.msgListenerObj[id][name];
+					delete plugin.msgListenerObj[id][name];
 				}
 			} else {
-				delete pluginObj.msgListenerObj[id];
+				delete plugin.msgListenerObj[id];
 			}
 			response = true;
 		}
@@ -112,11 +110,11 @@ var pluginObj = {
 		var nick = data[1][0], 
 			to = data[4][0], 
 			message = data[5]||data[4][1];
-		var messageARGS = botF.getArgsFromString(message)[0];
+		var messageARGS = bot.getArgsFromString(message)[0];
 		var target = to.charAt(0) == '#' ? to : nick;
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message, messageARGS: messageARGS, responseTarget: target};
 		if (!callback) {
-			pluginObj.msgEmit('PRIVMSG', parsedData);
+			plugin.msgEmit('PRIVMSG', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -129,7 +127,7 @@ var pluginObj = {
 			message = data[5]||data[4][1];
 		var parsedData = {rawdata: data, nick: nick, to: to, message: message};
 		if (!callback) {
-			pluginObj.msgEmit('NOTICE', parsedData);
+			plugin.msgEmit('NOTICE', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -141,7 +139,7 @@ var pluginObj = {
 		var channel = data[5]||data[4][0];
 		var parsedData = {rawdata: data, nick: nick, channel: channel};
 		if (!callback) {
-			pluginObj.msgEmit('JOIN', parsedData);
+			plugin.msgEmit('JOIN', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -154,7 +152,7 @@ var pluginObj = {
 		var reason = data[5];
 		var parsedData = {rawdata: data, nick: nick, channel: channel, reason: reason};
 		if (!callback) {
-			pluginObj.msgEmit('PART', parsedData);
+			plugin.msgEmit('PART', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -172,7 +170,7 @@ var pluginObj = {
 		}
 		var parsedData = {rawdata: data, nick: nick, reason: reason, channels: channels};
 		if (!callback) {
-			pluginObj.msgEmit('QUIT', parsedData);
+			plugin.msgEmit('QUIT', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -188,7 +186,7 @@ var pluginObj = {
 				if (modeParams[1].charAt(0) == '+') {
 					parsedData = {rawdata: data, by: by, target: modeParams[0], mode: modeParams[1].substr(1), param: modeParams[2]};
 					if (!callback) {
-						pluginObj.msgEmit('+MODE', parsedData);
+						plugin.msgEmit('+MODE', parsedData);
 					} else {
 						callback(parsedData);
 					}
@@ -196,7 +194,7 @@ var pluginObj = {
 				if (modeParams[1].charAt(0) == '-') {
 					parsedData = {rawdata: data, by: by, target: modeParams[0], mode: modeParams[1].substr(1), param: modeParams[2]};
 					if (!callback) {
-						pluginObj.msgEmit('-MODE', parsedData);
+						plugin.msgEmit('-MODE', parsedData);
 					} else {
 						callback(parsedData);
 					}
@@ -217,7 +215,7 @@ var pluginObj = {
 		}
 		var parsedData = {rawdata: data, nick: nick, newnick: newnick, channels: channels};
 		if (!callback) {
-			pluginObj.msgEmit('NICK', parsedData);
+			plugin.msgEmit('NICK', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -231,7 +229,7 @@ var pluginObj = {
 		var reason = data[5];
 		var parsedData = {rawdata: data, by: by, channel: channel, nick: nick, reason: reason};
 		if (!callback) {
-			pluginObj.msgEmit('KICK', parsedData);
+			plugin.msgEmit('KICK', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -244,7 +242,7 @@ var pluginObj = {
 		var topic = data[5];
 		var parsedData = {rawdata: data, nick: nick, channel: channel, topic: topic};
 		if (!callback) {
-			pluginObj.msgEmit('TOPIC', parsedData);
+			plugin.msgEmit('TOPIC', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -262,7 +260,7 @@ var pluginObj = {
 		}
 		var parsedData = {rawdata: data, nick: nick, reason: reason, channels: channels};
 		if (!callback) {
-			pluginObj.msgEmit('QUIT', parsedData);
+			plugin.msgEmit('QUIT', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -313,7 +311,7 @@ var pluginObj = {
 			}
 		}
 		if (!callback) {
-			pluginObj.msgEmit('RPL_WHOISUSER', parsedData);
+			plugin.msgEmit('RPL_WHOISUSER', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -341,7 +339,7 @@ var pluginObj = {
 			}
 		}
 		if (!callback) {
-			pluginObj.msgEmit('RPL_WHOREPLY', parsedData);
+			plugin.msgEmit('RPL_WHOREPLY', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -352,8 +350,8 @@ var pluginObj = {
 		var channel = data[1][0][4];
 		var nicks = {};
 		var supportedPrefixes = "@+";
-		for (var prefix in botObj.publicData.botVariables.ircSupportedUserModesArray) {
-			supportedPrefixes += botObj.publicData.botVariables.ircSupportedUserModesArray[prefix][1];
+		for (var prefix in bot.ircSupportedUserModesArray) {
+			supportedPrefixes += bot.ircSupportedUserModesArray[prefix][1];
 		}
 		for (var line in data[1]) {
 			var nickArray = data[1][line][5].split(' ');
@@ -364,7 +362,7 @@ var pluginObj = {
 		}
 		var parsedData = {rawdata: data, channel: channel, nicks: nicks};
 		if (!callback) {
-			pluginObj.msgEmit('RPL_NAMREPLY', parsedData);
+			plugin.msgEmit('RPL_NAMREPLY', parsedData);
 		} else {
 			callback(parsedData);
 		}
@@ -372,7 +370,7 @@ var pluginObj = {
 };
 
 //exports
-module.exports.plugin = pluginObj;
+module.exports.plugin = plugin;
 module.exports.ready = false;
 
 //reserved functions
@@ -382,35 +380,33 @@ module.exports.botEvent = function (event) {
 	var suffix;
 	if (event.eventName.substr(0, 'botReceived'.length) == 'botReceived') {
 		suffix = event.eventName.substr('botReceived'.length);
-		if (pluginObj['msgParse'+suffix] !== undefined) {
-			pluginObj['msgParse'+suffix](event.eventData);
+		if (plugin['msgParse'+suffix] !== undefined) {
+			plugin['msgParse'+suffix](event.eventData);
 		}
 	}
 	switch (event.eventName) {
-		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveListeners) {pluginObj.msgListenerRemove(event.eventData);} break;
-		case 'botReceivedDataParsedLine': pluginObj.msgEmit('RAW', event.eventData); break;
+		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveListeners) {plugin.msgListenerRemove(event.eventData);} break;
+		case 'botReceivedDataParsedLine': plugin.msgEmit('RAW', event.eventData); break;
 	}
 };
 
 //reserved functions: main function called when plugin is loaded
-module.exports.main = function (passedData) {
+module.exports.main = function (i, b) {
 	//update variables
-	botObj = passedData.botObj;
-	pluginId = passedData.id;
-	botF = botObj.publicData.botFunctions;
-	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.options;
+	bot = b;
+	pluginId = i;
+	settings = bot.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = botV.ircChannelUsers;
+	ircChannelUsers = bot.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
 		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[pluginId] = pluginSettings;
-		botF.botSettingsSave();
+		bot.botSettingsSave();
 	}
 	
 	//plugin is ready
 	exports.ready = true;
-	botF.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pluginId);
 };

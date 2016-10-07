@@ -20,10 +20,8 @@
 
 "use strict";
 //reserved nBot variables
-var botObj;
+var bot;
 var pluginId;
-var botF;
-var botV;
 var settings;
 var pluginSettings;
 var ircChannelUsers;
@@ -53,12 +51,12 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var pluginObj = {
+var plugin = {
 	//put all your functions here
 };
 
 //exports
-module.exports.plugin = pluginObj;
+module.exports.plugin = plugin;
 module.exports.ready = false;
 
 //reserved functions
@@ -72,24 +70,22 @@ module.exports.botEvent = function (event) {
 };
 
 //reserved functions: main function called when plugin is loaded
-module.exports.main = function (passedData) {
+module.exports.main = function (i, b) {
 	//update variables
-	botObj = passedData.botObj;
-	pluginId = passedData.id;
-	botF = botObj.publicData.botFunctions;
-	botV = botObj.publicData.botVariables;
-	settings = botObj.publicData.options;
+	bot = b;
+	pluginId = i;
+	settings = bot.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = botV.ircChannelUsers;
+	ircChannelUsers = bot.ircChannelUsers;
 	
 	//if plugin settings are not defined, define them
 	if (pluginSettings === undefined) {
 		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[pluginId] = pluginSettings;
-		botF.botSettingsSave();
+		bot.botSettingsSave();
 	}
 	
 	//plugin is ready
 	exports.ready = true;
-	botF.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pluginId);
 };
