@@ -27,34 +27,25 @@ var pluginSettings;
 var ircChannelUsers;
 
 //variables
-var http = require('http');
-var net = require('net');
-var fs = require('fs');
-var util = require('util');
-var events = require('events');
-var exec = require('child_process').exec;
-var path = require('path');
-var vm = require('vm');
-
 var pluginDisabled = false;
 
 //main plugin object
 var plugin = {
-	handleNewConnection: function (ircConnection) {
-		ircConnection.setTimeout(60*1000);
-		ircConnection.once('error', function (e) {
+	handleNewConnection: function (c) {
+		c.setTimeout(60*1000);
+		c.on('error', function (e) {
 			if (!pluginDisabled) {
-				ircConnection.end();
-				ircConnection.destroy();
+				c.end();
+				c.destroy();
 			}
 		});
-		ircConnection.once('timeout', function (e) {
+		c.on('timeout', function (e) {
 			if (!pluginDisabled) {
-				ircConnection.end();
-				ircConnection.destroy();
+				c.end();
+				c.destroy();
 			}
 		});
-		ircConnection.once('close', function() {
+		c.on('close', function() {
 			if (!pluginDisabled) {
 				setTimeout(function() {
 					if (!pluginDisabled) {bot.init();}
@@ -73,8 +64,12 @@ module.exports.ready = false;
 //reserved functions: handle "botEvent" from bot (botEvent is used for irc related activity)
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
-		case 'botIrcConnectionCreated': plugin.handleNewConnection(event.eventData); break;
-		case 'botPluginDisableEvent': if (event.eventData == pluginId) {pluginDisabled = true;} break;
+		case 'botIrcConnectionCreated':
+			plugin.handleNewConnection(event.eventData);
+			break;
+		case 'botPluginDisableEvent':
+			if (event.eventData == pluginId) {pluginDisabled = true;}
+			break;
 	}
 };
 

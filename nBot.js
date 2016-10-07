@@ -92,7 +92,7 @@ var SettingsConstructor = {
 		this.plugins = [ 
 			'simpleMsg',
 			'commands',
-			'connectionErrorResolver'
+			'reconnect'
 		];
 		this.pluginsSettings = {};
 		for (attrname in modified) {this[attrname]=modified[attrname];}
