@@ -15,9 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/*jshint node: true*/
-/*jshint evil: true*/
-
 "use strict";
 //variables
 var net = require('net');
@@ -290,8 +287,6 @@ function initTerminal() {
 
 //misc functions: start a nBot connection from settings using sequential id
 function botCreateInstance(connectionId) {
-	/*jshint -W055 */
-	
 	var bot = new Bot(nBot.connSettings[connectionId]);
 	var options = bot.options;
 	
@@ -324,9 +319,8 @@ function botCreateInstance(connectionId) {
 	
 	nBot.connObjArr[connectionId] = bot;
 	
-	//expose variables
+	//expose variables and functions
 	bot.botInstanceEventHandles = botInstanceEventHandles;
-	//expose functions
 	bot.botSettingsLoad = botSettingsLoad;
 	bot.botSettingsSave = botSettingsSave;
 	
