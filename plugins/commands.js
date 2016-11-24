@@ -34,6 +34,8 @@ var exec = require('child_process').exec;
 var events = require('events');
 var url = require('url');
 
+var pluginDisabled = false;
+
 //settings constructor
 var SettingsConstructor = function (modified) {
 	var settings, attrname;
@@ -58,461 +60,745 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var plugin = {
-	//variables
-	authenticatedOpUsers: [],
-	commandsOriginObj: {},
-	netsplitData: [[false, false], {}, {}],
-	
-	//misc plugin functions
-	
-	//misc plugin functions: ping the server by connecting and quickly closing
-	pingTcpServer: function (host, port, callback){
-		var isFinished = false;
-		var timeA, timeB = new Date().getTime();
-		function returnResults(status, info) {if (!isFinished) {callback(status, info); isFinished = true;}}
-		if (port > 0 && port < 65536) {
-			var pingHost = net.connect({port: port, host: host}, function () {
-				timeA = new Date().getTime();
-				returnResults(true, timeA-timeB);
-				pingHost.end();pingHost.destroy();
-			});
-			pingHost.setTimeout(5*1000);
-			pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false, 'timeout');});
-			pingHost.on('error', function (e) {pingHost.end();pingHost.destroy();returnResults(false, 'error: ('+e+')');});
-			pingHost.on('close', function () {returnResults(false, 'closed');});
-		} else {returnResults(false, 'error: port out of range');}
-	},
-	
-	//misc plugin functions: return entire help
-	getHelpAll: function () {
-		var commandArray = plugin.commandHelp('arrayOfCommands'), commandString = "";
-		for (var command in commandArray) {
-			commandString=commandString+pluginSettings.commandPrefix+plugin.commandHelp('commandInfo', commandArray[command])+'\n';
-		}
-		return 'Help for all commands:\n'+commandString;
-	},
-	
-	//misc plugin functions: get random int
-	getRandomInt: function (min, max) {
-	    return Math.floor(Math.random() * (max - min + 1)) + min;
-	},
-	
-	//misc plugin functions: is the user op
-	isOp: function (user, checkAuth){
-		var isOpUser = false;
-		if (checkAuth === undefined) {checkAuth=true;}
-		if (pluginSettings.opUsers[user]) {
-			if (checkAuth === true) {
-				for (var authenticatedOpUser in plugin.authenticatedOpUsers) {
-						if (user == plugin.authenticatedOpUsers[authenticatedOpUser]) {isOpUser = true;}
-				}
-			}else if (checkAuth === false){
-				isOpUser = true;
-			}
-		}
-		if (pluginSettings.opUsers_disabled) {isOpUser = true;}
-		return isOpUser;
-	},
-	
-	//misc plugin functions: give a user operator status
-	giveOp: function (user, pass) {
-		var response = "Unknown error happened";
-		if (!user && !pass) {
-			response = "Error: User and password must be defined";
-		} else if (plugin.isOp(user, false) === false) {
-			pluginSettings.opUsers[user]=pass;
-			response = "Success: User is now an Operator";
-		} else {
-			response = "Error: User is already an Operator";
-		}
-		return response;
-	},
-	
-	//misc plugin functions: take operator status from a user
-	takeOp: function (user) {
-		var response = "Unknown error happened";
-		if (plugin.isOp(user, false) === true) {
-			delete pluginSettings.opUsers[user];
-			plugin.authenticatedOpUsers.arrayValueRemove(user);
-			response = "Success: User is no longer an Operator";
-		} else {
-			response = "Error: User is not an Operator";
-		}
-		return response;
-	},
-	
-	//misc plugin functions: authenticate user
-	authenticateOp: function (user, pass, ignorePass) {
-		var response = "Error: Wrong username or password";
-		if (plugin.isOp(user, false) === true && plugin.isOp(user) === false) {
-			if(pass == pluginSettings.opUsers[user]  && pluginSettings.opUsers[user] !== ""){
-				response = "Success: Correct login";
-				plugin.authenticatedOpUsers.arrayValueAdd(user);
-			} else if (pluginSettings.opUsers[user] && ignorePass) {
-				response = "Success: Password ignored";
-				plugin.authenticatedOpUsers.arrayValueAdd(user);
-			} else {
-				response = "Error: Wrong username or password";
-			}
-		} else if (plugin.isOp(user) === true) {response = "Error: User is already authenticated";}
-		return response;
-	},
-	
-	//misc plugin functions: de-authenticate user
-	deAuthenticateOp: function (user) {
-		var response = "Unknown error happened";
-		if (plugin.isOp(user) === true) {
-			response = "Success: User has been de-authenticated";
-			plugin.authenticatedOpUsers.arrayValueRemove(user);
-		} else {
-			response = "Error: User is not authenticated";
-		}
-		return response;
-	},
-	
-	//misc plugin functions: short help message
-	getHelp: function () {
-		var helpMessage, commandArray = plugin.commandHelp('arrayOfCommands'), commandString = "";
-		for (var command in commandArray) {
-			commandString = commandString+commandArray[command]+", ";
-		}
-		commandString = commandString.replace(/, $/, ".");
-		helpMessage = 'Commands are prefixed with "'+pluginSettings.commandPrefix+'"\n'+'use '+pluginSettings.commandPrefix+'help "command" to get more info about the command\n'+'Current commands are: '+commandString;
-		return helpMessage;
-	},
-	
-	//misc plugin functions: is the user op on channel
-	isChanOp: function (user, channel){
-		var isUserChanOp = false;
-		if (ircChannelUsers[channel] && ircChannelUsers[channel][user] && ircChannelUsers[channel][user].mode) {
-			if (ircChannelUsers[channel][user].mode.replace(/^(o|q|h|a)$/, "isOp").indexOf("isOp") != -1 ) {isUserChanOp = true;}
-			if (ircChannelUsers[channel][user].isGlobalOP) {isUserChanOp = true;}
-		}
-		return isUserChanOp;
-	},
-	
-	//misc plugin functions: check if plugin is ready
-	pluginReadyCheck: function () {
-		if (bot.plugins.simpleMsg &&
-		bot.plugins.simpleMsg.ready) {
-			//plugin is ready
-			exports.ready = true;
-			bot.emitBotEvent('botPluginReadyEvent', pluginId);
-		}
-	},
-	
-	//misc plugin functions: add listeners to simpleMsg plugin
-	utilizeSimpleMsg: function () {
-		var simpleMsg = bot.plugins.simpleMsg.plugin;
-		simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
-			plugin.commandHandle(data);
-			plugin.dynamicFunctionHandle(data);
-			plugin.pluggableFunctionHandle(data);
-			if (pluginSettings.specificResponses[data.message] !== undefined) {
-				bot.ircSendCommandPRIVMSG(pluginSettings.specificResponses[data.message], data.responseTarget);
-			}
+var plugin = {};
+
+//variables
+plugin.authenticatedOpUsers = [];
+plugin.commandsOriginObj = {};
+plugin.netsplitData = [[false, false], {}, {}];
+
+//misc plugin functions
+
+//misc plugin functions: ping the server by connecting and quickly closing
+plugin.pingTcpServer = function (host, port, callback){
+	var isFinished = false;
+	var timeA, timeB = new Date().getTime();
+	function returnResults(status, info) {if (!isFinished) {callback(status, info); isFinished = true;}}
+	if (port > 0 && port < 65536) {
+		var pingHost = net.connect({port: port, host: host}, function () {
+			timeA = new Date().getTime();
+			returnResults(true, timeA-timeB);
+			pingHost.end();pingHost.destroy();
 		});
-		
-		simpleMsg.msgListenerAdd(pluginId, 'JOIN', function (data) {
-			if (data.nick != settings.botName){
-				if (pluginSettings.reactToJoinPart === true) {
-					var isNetsplit = false;
-					if (Object.keys(plugin.netsplitData[1]).length) {
-						if (plugin.netsplitData[1][data.nick]) {
-							isNetsplit = true;
-							delete plugin.netsplitData[1][data.nick];
-							if (plugin.netsplitData[0][1]) {
-								clearTimeout(plugin.netsplitData[0][1]);
-							}
-							plugin.netsplitData[0][1] = setTimeout(function () {
-								plugin.netsplitData[0][1] = false;
-								for (var channel in plugin.netsplitData[2]) {
-									bot.ircSendCommandPRIVMSG('Netsplit over!', channel);
-								}
-								plugin.netsplitData[2] = {};
-							}, 2000);
-						}
-					}
-					if (!isNetsplit) {
-						bot.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
-						if (data.nick == "nnnn20430"){bot.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
-					}
-				}
+		pingHost.setTimeout(5*1000);
+		pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false, 'timeout');});
+		pingHost.on('error', function (e) {pingHost.end();pingHost.destroy();returnResults(false, 'error: ('+e+')');});
+		pingHost.on('close', function () {returnResults(false, 'closed');});
+	} else {returnResults(false, 'error: port out of range');}
+};
+
+//misc plugin functions: return entire help
+plugin.getHelpAll = function () {
+	var commandArray = plugin.commandHelp('arrayOfCommands'), commandString = "";
+	for (var command in commandArray) {
+		commandString=commandString+pluginSettings.commandPrefix+plugin.commandHelp('commandInfo', commandArray[command])+'\n';
+	}
+	return 'Help for all commands:\n'+commandString;
+};
+
+//misc plugin functions: get random int
+plugin.getRandomInt = function (min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
+//misc plugin functions: is the user op
+plugin.isOp = function (user, checkAuth){
+	var isOpUser = false;
+	if (checkAuth === undefined) {checkAuth=true;}
+	if (pluginSettings.opUsers[user]) {
+		if (checkAuth === true) {
+			for (var authenticatedOpUser in plugin.authenticatedOpUsers) {
+					if (user == plugin.authenticatedOpUsers[authenticatedOpUser]) {isOpUser = true;}
 			}
-		});
-		
-		simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
-			if (data.nick != settings.botName){
-				if (pluginSettings.reactToJoinPart === true) {
-					bot.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channel);
-				}
-				if(plugin.isOp(data.nick)){
-					plugin.authenticatedOpUsers.arrayValueRemove(data.nick);
-					bot.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
-				}
-			}
-		});
-		
-		simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
-			if (data.nick != settings.botName){
-				if(plugin.isOp(data.nick)){plugin.authenticatedOpUsers.arrayValueRemove(data.nick);}
-				if (pluginSettings.reactToJoinPart === true) {
-					//detect netsplits
-					var isNetsplit = false;
-					for (var server in bot.ircNetworkServers) {
-						if (data.reason.split(' ')[0] == bot.ircNetworkServers[server].mask) {
-							isNetsplit = true;
+		}else if (checkAuth === false){
+			isOpUser = true;
+		}
+	}
+	if (pluginSettings.opUsers_disabled) {isOpUser = true;}
+	return isOpUser;
+};
+
+//misc plugin functions: give a user operator status
+plugin.giveOp = function (user, pass) {
+	var response = "Unknown error happened";
+	if (!user && !pass) {
+		response = "Error: User and password must be defined";
+	} else if (plugin.isOp(user, false) === false) {
+		pluginSettings.opUsers[user]=pass;
+		response = "Success: User is now an Operator";
+	} else {
+		response = "Error: User is already an Operator";
+	}
+	return response;
+};
+
+//misc plugin functions: take operator status from a user
+plugin.takeOp = function (user) {
+	var response = "Unknown error happened";
+	if (plugin.isOp(user, false) === true) {
+		delete pluginSettings.opUsers[user];
+		bot.arrRm(plugin.authenticatedOpUsers, user);
+		response = "Success: User is no longer an Operator";
+	} else {
+		response = "Error: User is not an Operator";
+	}
+	return response;
+};
+
+//misc plugin functions: authenticate user
+plugin.authenticateOp = function (user, pass, ignorePass) {
+	var response = "Error: Wrong username or password";
+	if (plugin.isOp(user, false) === true && plugin.isOp(user) === false) {
+		if(pass == pluginSettings.opUsers[user]  && pluginSettings.opUsers[user] !== ""){
+			response = "Success: Correct login";
+			plugin.authenticatedOpUsers.push(user);
+		} else if (pluginSettings.opUsers[user] && ignorePass) {
+			response = "Success: Password ignored";
+			plugin.authenticatedOpUsers.push(user);
+		} else {
+			response = "Error: Wrong username or password";
+		}
+	} else if (plugin.isOp(user) === true) {response = "Error: User is already authenticated";}
+	return response;
+};
+
+//misc plugin functions: de-authenticate user
+plugin.deAuthenticateOp = function (user) {
+	var response = "Unknown error happened";
+	if (plugin.isOp(user) === true) {
+		response = "Success: User has been de-authenticated";
+		bot.arrRm(plugin.authenticatedOpUsers, user);
+	} else {
+		response = "Error: User is not authenticated";
+	}
+	return response;
+};
+
+//misc plugin functions: short help message
+plugin.getHelp = function () {
+	var helpMessage, commandArray = plugin.commandHelp('arrayOfCommands'), commandString = "";
+	for (var command in commandArray) {
+		commandString = commandString+commandArray[command]+", ";
+	}
+	commandString = commandString.replace(/, $/, ".");
+	helpMessage = 'Commands are prefixed with "'+pluginSettings.commandPrefix+'"\n'+'use '+pluginSettings.commandPrefix+'help "command" to get more info about the command\n'+'Current commands are: '+commandString;
+	return helpMessage;
+};
+
+//misc plugin functions: is the user op on channel
+plugin.isChanOp = function (user, channel){
+	var isUserChanOp = false;
+	if (ircChannelUsers[channel] && ircChannelUsers[channel][user] && ircChannelUsers[channel][user].mode) {
+		if (ircChannelUsers[channel][user].mode.replace(/^(o|q|h|a)$/, "isOp").indexOf("isOp") != -1 ) {isUserChanOp = true;}
+		if (ircChannelUsers[channel][user].isGlobalOP) {isUserChanOp = true;}
+	}
+	return isUserChanOp;
+};
+
+//misc plugin functions: check if plugin is ready
+plugin.pluginReadyCheck = function () {
+	if (bot.plugins.simpleMsg &&
+	bot.plugins.simpleMsg.ready) {
+		//plugin is ready
+		exports.ready = true;
+		bot.emitBotEvent('botPluginReadyEvent', pluginId);
+	}
+};
+
+//misc plugin functions: add listeners to simpleMsg plugin
+plugin.utilizeSimpleMsg = function () {
+	var simpleMsg = bot.plugins.simpleMsg.plugin;
+	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
+		plugin.commandHandle(data);
+		plugin.dynamicFunctionHandle(data);
+		plugin.pluggableFunctionHandle(data);
+		if (pluginSettings.specificResponses[data.message] !== undefined) {
+			bot.ircSendCommandPRIVMSG(pluginSettings.specificResponses[data.message], data.responseTarget);
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'JOIN', function (data) {
+		if (data.nick != settings.botName){
+			if (pluginSettings.reactToJoinPart === true) {
+				var isNetsplit = false;
+				if (Object.keys(plugin.netsplitData[1]).length) {
+					if (plugin.netsplitData[1][data.nick]) {
+						isNetsplit = true;
+						delete plugin.netsplitData[1][data.nick];
+						if (plugin.netsplitData[0][1]) {
+							clearTimeout(plugin.netsplitData[0][1]);
 						}
-					}
-					if (isNetsplit) {
-						if (plugin.netsplitData[0][0]) {
-							clearTimeout(plugin.netsplitData[0][0]);
-						}
-						plugin.netsplitData[0][0] = setTimeout(function () {
-							plugin.netsplitData[0][0] = false;
+						plugin.netsplitData[0][1] = setTimeout(function () {
+							plugin.netsplitData[0][1] = false;
 							for (var channel in plugin.netsplitData[2]) {
-								bot.ircSendCommandPRIVMSG('Netsplit: '+data.reason.split(' ')[0]+'<=>'+data.reason.split(' ')[1]+'.', channel);
+								bot.ircSendCommandPRIVMSG('Netsplit over!', channel);
 							}
+							plugin.netsplitData[2] = {};
 						}, 2000);
-						plugin.netsplitData[1][data.nick] = true;
-						for (var channelS in data.channels) {
-							plugin.netsplitData[2][data.channels[channelS]] = true;
+					}
+				}
+				if (!isNetsplit) {
+					bot.ircSendCommandPRIVMSG('Welcome '+data.nick+' to channel '+data.channel, data.channel);
+					if (data.nick == "nnnn20430"){bot.ircSendCommandPRIVMSG('My Creator is here!!!', data.channel);}
+				}
+			}
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
+		if (data.nick != settings.botName){
+			if (pluginSettings.reactToJoinPart === true) {
+				bot.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channel);
+			}
+			if(plugin.isOp(data.nick)){
+				bot.arrRm(plugin.authenticatedOpUsers, data.nick);
+				bot.ircSendCommandPRIVMSG('You have left a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
+			}
+		}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
+		if (data.nick != settings.botName){
+			if(plugin.isOp(data.nick)){bot.arrRm(plugin.authenticatedOpUsers, data.nick);}
+			if (pluginSettings.reactToJoinPart === true) {
+				//detect netsplits
+				var isNetsplit = false;
+				for (var server in bot.ircNetworkServers) {
+					if (data.reason.split(' ')[0] == bot.ircNetworkServers[server].mask) {
+						isNetsplit = true;
+					}
+				}
+				if (isNetsplit) {
+					if (plugin.netsplitData[0][0]) {
+						clearTimeout(plugin.netsplitData[0][0]);
+					}
+					plugin.netsplitData[0][0] = setTimeout(function () {
+						plugin.netsplitData[0][0] = false;
+						for (var channel in plugin.netsplitData[2]) {
+							bot.ircSendCommandPRIVMSG('Netsplit: '+data.reason.split(' ')[0]+'<=>'+data.reason.split(' ')[1]+'.', channel);
 						}
-					} else {
-						for (var channel in data.channels) {
-							bot.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
-						}
+					}, 2000);
+					plugin.netsplitData[1][data.nick] = true;
+					for (var channelS in data.channels) {
+						plugin.netsplitData[2][data.channels[channelS]] = true;
+					}
+				} else {
+					for (var channel in data.channels) {
+						bot.ircSendCommandPRIVMSG('Goodbye '+data.nick, data.channels[channel]);
 					}
 				}
 			}
-		});
-		
-		simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
-			if (data.nick != settings.botName){
-				if(plugin.isOp(data.nick)){
-					plugin.authenticatedOpUsers.arrayValueRemove(data.nick);
-					bot.ircSendCommandPRIVMSG('You have changed your authenticated operator nickname you have been de-authenticated', data.newnick);
-				}
-			}
-		});
-		
-		simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
-			if (data.nick != settings.botName){
-				if(plugin.isOp(data.nick)){
-					plugin.authenticatedOpUsers.arrayValueRemove(data.nick);
-					bot.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
-				}
-			}
-		});
-		
-		plugin.pluginReadyCheck();
-	},
-	
-	//bot command handle functions
-	
-	//bot command handle functions: command help manager
-	commandHelp: function (purpose, command) {
-		var response, index;
-		if (purpose == 'arrayOfCommands') {
-			var commandArray = [];
-			for (index in plugin.commandsHelpArray) {
-				if(plugin.commandsHelpArray.hasOwnProperty(index)) {
-					commandArray[index] = plugin.commandsHelpArray[index][0];
-				}
-			}
-			response = commandArray;
 		}
-		if (purpose == 'commandInfo') {
-			response = 'Command not found';
-			for (index in plugin.commandsHelpArray) {
-				if(plugin.commandsHelpArray.hasOwnProperty(index)) {
-					if (plugin.commandsHelpArray[index][0] == command) {response = plugin.commandsHelpArray[index][1];}
-				}
+	});
+	
+	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+		if (data.nick != settings.botName){
+			if(plugin.isOp(data.nick)){
+				bot.arrRm(plugin.authenticatedOpUsers, data.nick);
+				bot.ircSendCommandPRIVMSG('You have changed your authenticated operator nickname you have been de-authenticated', data.newnick);
 			}
 		}
-		return response;
-	},
+	});
 	
-	//bot command handle functions: handle simple bot commands
-	commandHandle: function (data) {
-		var command = data.messageARGS[0]||'', isCommand = false;
-		if (command.substr(0, pluginSettings.commandPrefix.length) == pluginSettings.commandPrefix) {
-			command = command.substr(pluginSettings.commandPrefix.length);
-			isCommand = true;
-		} else if (pluginSettings.commandPrefixIgnoreOnDirect && data.to.charAt(0) != '#') {
-			isCommand = true;
-		}
-		if (isCommand === true) {
-			if (plugin.commandsObject[command] !== undefined) {
-				try {
-					plugin.commandsObject[command](data);
-				} catch (e) {
-					bot.debugMsg('Error: Simple bot command "'+command+'" from plugin "'+plugin.getCommandOrigin(command)+'" is erroneous:'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
-				}
+	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
+		if (data.nick != settings.botName){
+			if(plugin.isOp(data.nick)){
+				bot.arrRm(plugin.authenticatedOpUsers, data.nick);
+				bot.ircSendCommandPRIVMSG('You have been kicked from a channel with '+settings.botName+' in it you have been de-authenticated', data.nick);
 			}
 		}
-	},
+	});
 	
-	//bot command handle functions: add simple bot command (for plugins)
-	commandAdd: function (command, commandFunction, helpString, origin) {
-		var response = "Unknown error happened";
-		if (plugin.commandsObject[command] === undefined) {
-			response = "Success: Command added";
-			plugin.commandsObject[command] = commandFunction;
-			if (helpString) {plugin.commandsHelpArray.arrayValueAdd([command, helpString]);}
-			if (origin) {plugin.commandsOriginObj[command] = origin;}
-		} else {
-			response = "Error: Command already exists";
+	plugin.pluginReadyCheck();
+};
+
+//bot command handle functions
+
+//bot command handle functions: command help manager
+plugin.commandHelp = function (purpose, command) {
+	var response, index;
+	if (purpose == 'arrayOfCommands') {
+		var commandArray = [];
+		for (index in plugin.commandsHelpArray) {
+			if(plugin.commandsHelpArray.hasOwnProperty(index)) {
+				commandArray[index] = plugin.commandsHelpArray[index][0];
+			}
 		}
-		return response;
-	},
-	
-	//bot command handle functions: remove simple bot command
-	commandRemove: function (command) {
-		var response = "Unknown error happened", index;
+		response = commandArray;
+	}
+	if (purpose == 'commandInfo') {
+		response = 'Command not found';
+		for (index in plugin.commandsHelpArray) {
+			if(plugin.commandsHelpArray.hasOwnProperty(index)) {
+				if (plugin.commandsHelpArray[index][0] == command) {response = plugin.commandsHelpArray[index][1];}
+			}
+		}
+	}
+	return response;
+};
+
+//bot command handle functions: handle simple bot commands
+plugin.commandHandle = function (data) {
+	var command = data.messageARGS[0]||'', isCommand = false;
+	if (command.substr(0, pluginSettings.commandPrefix.length) == pluginSettings.commandPrefix) {
+		command = command.substr(pluginSettings.commandPrefix.length);
+		isCommand = true;
+	} else if (pluginSettings.commandPrefixIgnoreOnDirect && data.to.charAt(0) != '#') {
+		isCommand = true;
+	}
+	if (isCommand === true) {
 		if (plugin.commandsObject[command] !== undefined) {
-			response = "Success: Command removed";
-			delete plugin.commandsObject[command];
-			for (index in plugin.commandsHelpArray) {
-				if(plugin.commandsHelpArray.hasOwnProperty(index)) {
-					if (plugin.commandsHelpArray[index][0] == command) {
-						plugin.commandsHelpArray.arrayValueRemove(plugin.commandsHelpArray[index]);
-					}
+			try {
+				plugin.commandsObject[command](data);
+			} catch (e) {
+				bot.log('Error: Simple bot command "'+command+'" from plugin "'+plugin.getCommandOrigin(command)+'" is erroneous:'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
+			}
+		}
+	}
+};
+
+//bot command handle functions: add simple bot command (for plugins)
+plugin.commandAdd = function (command, commandFunction, helpString, origin) {
+	var response = "Unknown error happened";
+	if (plugin.commandsObject[command] === undefined) {
+		response = "Success: Command added";
+		plugin.commandsObject[command] = commandFunction;
+		if (helpString) {plugin.commandsHelpArray.push([command, helpString]);}
+		if (origin) {plugin.commandsOriginObj[command] = origin;}
+	} else {
+		response = "Error: Command already exists";
+	}
+	return response;
+};
+
+//bot command handle functions: remove simple bot command
+plugin.commandRemove = function (command) {
+	var response = "Unknown error happened", index;
+	if (plugin.commandsObject[command] !== undefined) {
+		response = "Success: Command removed";
+		delete plugin.commandsObject[command];
+		for (index in plugin.commandsHelpArray) {
+			if(plugin.commandsHelpArray.hasOwnProperty(index)) {
+				if (plugin.commandsHelpArray[index][0] == command) {
+					bot.arrRm(plugin.commandsHelpArray, plugin.commandsHelpArray[index]);
 				}
 			}
-			if (plugin.commandsOriginObj[command] !== undefined) {delete plugin.commandsOriginObj[command];}
+		}
+		if (plugin.commandsOriginObj[command] !== undefined) {delete plugin.commandsOriginObj[command];}
+	} else {
+		response = "Error: Command doesn't exist";
+	}
+	return response;
+};
+
+//bot command handle functions: simple bot command origin
+plugin.getCommandOrigin = function (command) {
+	var response = pluginId;
+	if (plugin.commandsOriginObj[command] !== undefined) {response = plugin.commandsOriginObj[command];}
+	return response;
+};
+
+//bot command handle functions: remove commands with same origin
+plugin.commandsRemoveByOrigin = function (origin) {
+	var command;
+	for (command in plugin.commandsOriginObj) {
+		if (plugin.commandsOriginObj[command] == origin) {
+			plugin.commandRemove(command);
+		}
+	}
+};
+
+//bot command handle functions: handle dynamic bot functions
+plugin.dynamicFunctionHandle = function (data) {
+	var dynamicFunction;
+	for (var dynamicFunctionName in pluginSettings.dynamicFunctions) {
+		try {
+			dynamicFunction=eval("(function (data) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
+			dynamicFunction(data);
+		} catch (e) {
+			bot.log('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous:'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
+		}
+	}
+};
+
+//bot command handle functions: pluggable functions (to make it easier for plugins to add or remove functions)
+plugin.pluggableFunctionHandle = function (data) {
+	for (var pluggableFunction in plugin.pluggableFunctionObject) {
+		plugin.pluggableFunctionObject[pluggableFunction](data);
+	}
+};
+
+//bot commands help array
+plugin.commandsHelpArray = [
+	['hug', 'hug: gives you a free hug'],
+	['whereis', 'whereis "user": lists the channels the user is in (the command can contain anything between where and is)'],
+	['echo', 'echo "string": prints string back to the chat'],
+	['sendmsg', 'sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)'],
+	['view', 'view "url": prints the data located at the url, data must not be bigger than 1KiB'],
+	['ping', 'ping "host" "port": pings the port on host'],
+	['nbot', 'nbot: prints some info about nBot'],
+	['help', 'help: prints help message'],
+	['away', 'away: prints a list of away users in the channel'],
+	['userlist', 'userlist [count|update]: prints a list of users on the channel'],
+	['origin', 'origin "command": prints plugin origin of a command'],
+	['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
+	['savesettings', 'savesettings: save current settings to file (op only)'],
+	['join', 'join "#channel": make the bot join the channel (op only)'],
+	['part', 'part "#channel": make the bot part the channel (op only)'],
+	['login', 'login "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
+	['logout', 'logout: de-authenticate (op only)'],
+	['op', 'op "user" "password": give the user Operator status (op only)'],
+	['deop', 'deop "user": take Operator status from the user (op only)'],
+	['helpall', 'helpall: prints help for all commands to the user'],
+	['responseadd', 'responseadd "trigger" "response": add a response to trigger (op only)'],
+	['responseremove', 'responseremove "trigger": remove a response from trigger (op only)'],
+	['responselist', 'responselist: prints list of responses (op only)'],
+	['responseclear', 'responsereclear: remove all set triggered responses (op only)'],
+	['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variable data={rawdata, nick, to, message, messageARGS, responseTarget})'],
+	['functionremove', 'functionremove "name": remove a function named name (op only)'],
+	['functionlist', 'functionlist: prints list of functions (op only)'],
+	['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
+	['pluginreload', 'pluginreload "id": reload plugin with id (op only)'],
+	['pluginreloadall', 'pluginreloadall: reload all plugins (op only)'],
+	['evaljs', 'evaljs "code": evaluates node.js code (op only)'],
+	['pluginload', 'pluginload "plugin": load a plugin (op only)'],
+	['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
+	['date', 'date [UTC|ISO|UNIX]: get current date'],
+	['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
+	['binary', 'binary ENCODE|DECODE "string"']
+];
+
+//bot commands object
+plugin.commandsObject = {
+	hug: function (data) {
+		bot.ircSendCommandPRIVMSG('*Hugs '+data.nick+'*', data.responseTarget);
+	},
+	echo: function (data) {
+		var message = '';
+		for (var i in data.messageARGS) {
+			if (i > 0) {message += ' '+data.messageARGS[i];}
+		}
+		message=message.substr(1);
+		bot.ircSendCommandPRIVMSG(
+			bot.strReplaceEscapeSequences(message), data.responseTarget);
+	},
+	sendmsg: function (data) {
+		bot.ircSendCommandPRIVMSG(
+			bot.strReplaceEscapeSequences(data.messageARGS[2]), data.messageARGS[1]);
+	},
+	view: function (data) {
+		var protocol = false;
+		if (data.messageARGS[1].substr(0, 'http://'.length) == 'http://') {
+			protocol = http;
+		} else if (data.messageARGS[1].substr(0, 'https://'.length) == 'https://') {
+			protocol = https;
+		}
+		if (protocol) {
+			protocol.get(url.parse(data.messageARGS[1], true), function(res) {
+				var resData = '';
+				res.setEncoding('utf8');
+				res.on('data', function (chunk) {resData += chunk;});
+				res.on('end', function () {
+					if(resData.length < pluginSettings.command_request_maxBytes){
+						bot.ircSendCommandPRIVMSG(resData, data.responseTarget);
+					}
+				});
+			}).on('error', function(e) {
+				bot.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);
+			});
+		}
+	},
+	ping: function (data) {
+		plugin.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status, info) {
+			var statusString;
+			if (status){
+				statusString="open";
+			} else {
+				statusString="closed";
+			}
+			bot.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString+", "+(bot.isNumeric(info)?info+"ms":info), data.responseTarget);
+		});
+	},
+	nbot: function (data) {
+		bot.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: https://git.plfgr.eu.org/?p=nBot.git", data.responseTarget);
+	},
+	help: function (data) {
+		if (data.messageARGS[1] !== undefined) {
+			bot.ircSendCommandPRIVMSG(plugin.commandHelp("commandInfo", data.messageARGS[1]), data.responseTarget);
 		} else {
-			response = "Error: Command doesn't exist";
+			bot.ircSendCommandPRIVMSG(plugin.getHelp(), data.responseTarget);
 		}
-		return response;
 	},
-	
-	//bot command handle functions: simple bot command origin
-	getCommandOrigin: function (command) {
-		var response = pluginId;
-		if (plugin.commandsOriginObj[command] !== undefined) {response = plugin.commandsOriginObj[command];}
-		return response;
+	away: function (data) {
+		bot.ircUpdateUsersInChannel(data.responseTarget, function (userData) {
+			var ircGoneUsersString = "", user;
+			userData = userData[data.responseTarget];
+			for (user in userData) {
+				if (!userData[user].isHere) {
+					ircGoneUsersString +=user+", ";
+				}
+			}
+			bot.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);
+		});
 	},
-	
-	//bot command handle functions: remove commands with same origin
-	commandsRemoveByOrigin: function (origin) {
-		var command;
-		for (command in plugin.commandsOriginObj) {
-			if (plugin.commandsOriginObj[command] == origin) {
-				plugin.commandRemove(command);
+	userlist: function (data) {
+		if (data.messageARGS[1] == 'update') {
+			bot.ircUpdateUsersInChannel(data.responseTarget);
+		} else if (data.messageARGS[1] == 'count') {
+			bot.ircSendCommandPRIVMSG(Object.keys(ircChannelUsers[data.responseTarget]).length, data.responseTarget);
+		} else {
+			var nickList = '', nickTotal = 0, channelUsersObj = ircChannelUsers[data.responseTarget];
+			for (var user in channelUsersObj) {
+				nickList += bot.ircModePrefixConvert('prefix', channelUsersObj[user].mode)+user+', '; nickTotal++;
+			}
+			nickList = nickList.replace(/, $/, ". ");
+			nickList += '(Nick total: '+nickTotal+')';
+			bot.ircSendCommandPRIVMSG(nickList, data.responseTarget);
+		}
+	},
+	origin: function (data) {
+		if (plugin.commandsObject[data.messageARGS[1]] !== undefined) {
+			bot.ircSendCommandPRIVMSG('Command "'+data.messageARGS[1]+'" is from plugin "'+plugin.getCommandOrigin(data.messageARGS[1])+'"', data.responseTarget);
+		}
+	},
+	raw: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			bot.ircWriteData(data.messageARGS[1]);
+		}
+	},
+	savesettings: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			bot.im.settingsSave(null, null, function () {
+				bot.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);
+			});
+		}
+	},
+	join: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			settings.channels.push(data.messageARGS[1]);
+		}
+	},
+	part: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			bot.arrRm(settings.channels, data.messageARGS[1]);
+			bot.ircSendCommandPART(data.messageARGS[1], data.messageARGS[2]);
+		} else if (plugin.isChanOp(data.nick, data.responseTarget) === true &&
+		  pluginSettings.opUsers_commandsAllowChanOp) {
+			bot.arrRm(settings.channels, data.responseTarget);
+			bot.ircSendCommandPART(data.responseTarget);
+		}
+	},
+	login: function (data) {
+		bot.ircSendCommandPRIVMSG(plugin.authenticateOp(data.nick, data.messageARGS[1]), data.responseTarget);
+	},
+	logout: function (data) {
+		bot.ircSendCommandPRIVMSG(plugin.deAuthenticateOp(data.nick), data.responseTarget);
+	},
+	op: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			bot.ircSendCommandPRIVMSG(plugin.giveOp(data.messageARGS[1], data.messageARGS[2]), data.responseTarget);
+		}
+	},
+	deop: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			bot.ircSendCommandPRIVMSG(plugin.takeOp(data.messageARGS[1]), data.responseTarget);
+		}
+	},
+	helpall: function (data) {
+		bot.ircSendCommandPRIVMSG(plugin.getHelpAll(), data.nick);
+	},
+	responseadd: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			pluginSettings.specificResponses[data.messageARGS[1]]=data.messageARGS[2];
+		}
+	},
+	responseremove: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			delete pluginSettings.specificResponses[data.messageARGS[1]];
+		}
+	},
+	responselist: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			var specificResponseList="";
+			for (var specificResponse in pluginSettings.specificResponses) {
+				specificResponseList+="\""+specificResponse+"\", ";
+			}
+			bot.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);
+		}
+	},
+	reponseclear: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			pluginSettings.specificResponses = {};
+		}
+	},
+	functionadd: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			pluginSettings.dynamicFunctions[data.messageARGS[1]]=data.messageARGS[2];
+		}
+	},
+	functionremove: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			delete pluginSettings.dynamicFunctions[data.messageARGS[1]];
+		}
+	},
+	functionlist: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			var dynamicFunctionList="";
+			for (var dynamicFunction in pluginSettings.dynamicFunctions) {
+				dynamicFunctionList+="\""+dynamicFunction+"\", ";
+			}
+			bot.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);
+		}
+	},
+	functionshow: function (data) {
+		if(plugin.isOp(data.nick) === true) {
+			var dynamicFunction;
+			if ((dynamicFunction = pluginSettings.dynamicFunctions[data.messageARGS[1]]) !== undefined) {
+				bot.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);
+			} else {
+				bot.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);
 			}
 		}
 	},
-	
-	//bot command handle functions: handle dynamic bot functions
-	dynamicFunctionHandle: function (data) {
-		var dynamicFunction;
-		for (var dynamicFunctionName in pluginSettings.dynamicFunctions) {
-			try {
-				dynamicFunction=eval("(function (data) {"+pluginSettings.dynamicFunctions[dynamicFunctionName]+"})");
-				dynamicFunction(data);
-			} catch (e) {
-				bot.debugMsg('Error: Dynamic function "'+dynamicFunctionName+'" is erroneous:'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
+	pluginreload: function (data) {
+		if (plugin.isOp(data.nick) === true) {
+			if (bot.plugins[data.messageARGS[1]]) {
+				bot.pluginDisable(data.messageARGS[1]);
+				bot.pluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');
 			}
 		}
 	},
-	
-	//bot command handle functions: pluggable functions (to make it easier for plugins to add or remove functions)
-	pluggableFunctionHandle: function (data) {
-		for (var pluggableFunction in plugin.pluggableFunctionObject) {
-			plugin.pluggableFunctionObject[pluggableFunction](data);
+	pluginreloadall: function (data) {
+		function pluginReload(id) {
+			bot.pluginDisable(id);
+			bot.pluginLoad(id, settings.pluginDir+'/'+id+'.js');
+		}
+		if(plugin.isOp(data.nick) === true) {
+			pluginReload(pluginId);
+			for (var id in bot.plugins) {
+				if (id != pluginId && id != 'simpleMsg') {
+					pluginReload(id);
+				}
+			}
 		}
 	},
-	
-	//bot commands help array
-	commandsHelpArray: [
-		['hug', 'hug: gives you a free hug'],
-		['whereis', 'whereis "user": lists the channels the user is in (the command can contain anything between where and is)'],
-		['echo', 'echo "string": prints string back to the chat'],
-		['sendmsg', 'sendmsg "#channel" "string": prints string on the channel (only if the bot is in it)'],
-		['view', 'view "url": prints the data located at the url, data must not be bigger than 1KiB'],
-		['ping', 'ping "host" "port": pings the port on host'],
-		['nbot', 'nbot: prints some info about nBot'],
-		['help', 'help: prints help message'],
-		['away', 'away: prints a list of away users in the channel'],
-		['userlist', 'userlist [count|update]: prints a list of users on the channel'],
-		['origin', 'origin "command": prints plugin origin of a command'],
-		['raw', 'raw "raw command": make the bot send a raw command to the irc server (op only)'],
-		['savesettings', 'savesettings: save current settings to file (op only)'],
-		['join', 'join "#channel": make the bot join the channel (op only)'],
-		['part', 'part "#channel": make the bot part the channel (op only)'],
-		['login', 'login "password": authenticate as an Operator (op only)(please send this command directly to the bot)'],
-		['logout', 'logout: de-authenticate (op only)'],
-		['op', 'op "user" "password": give the user Operator status (op only)'],
-		['deop', 'deop "user": take Operator status from the user (op only)'],
-		['helpall', 'helpall: prints help for all commands to the user'],
-		['responseadd', 'responseadd "trigger" "response": add a response to trigger (op only)'],
-		['responseremove', 'responseremove "trigger": remove a response from trigger (op only)'],
-		['responselist', 'responselist: prints list of responses (op only)'],
-		['responseclear', 'responsereclear: remove all set triggered responses (op only)'],
-		['functionadd', 'functionadd "name" "code": add a function named name with node.js code (op only)(the function is passed variable data={rawdata, nick, to, message, messageARGS, responseTarget})'],
-		['functionremove', 'functionremove "name": remove a function named name (op only)'],
-		['functionlist', 'functionlist: prints list of functions (op only)'],
-		['functionshow', 'functionshow "name": prints the code of function named name (op only)'],
-		['pluginreload', 'pluginreload "id": reload plugin with id (op only)'],
-		['pluginreloadall', 'pluginreloadall: reload all plugins (op only)'],
-		['evaljs', 'evaljs "code": evaluates node.js code (op only)'],
-		['pluginload', 'pluginload "plugin": load a plugin (op only)'],
-		['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
-		['date', 'date [UTC|ISO|UNIX]: get current date'],
-		['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
-		['binary', 'binary ENCODE|DECODE "string"']
-	],
-	
-	//bot commands object
-	commandsObject: {
-		hug: function (data) {bot.ircSendCommandPRIVMSG('*Hugs '+data.nick+'*', data.responseTarget);},
-		echo: function (data) {var message = ''; for (var i in data.messageARGS) {if (i > 0) {message += ' '+data.messageARGS[i];}} message=message.substr(1); bot.ircSendCommandPRIVMSG(bot.strReplaceEscapeSequences(message), data.responseTarget);},
-		sendmsg: function (data) {bot.ircSendCommandPRIVMSG(bot.strReplaceEscapeSequences(data.messageARGS[2]), data.messageARGS[1]);},
-		view: function (data) {var protocol = false; if (data.messageARGS[1].substr(0, 'http://'.length) == 'http://') {protocol = http;} else if (data.messageARGS[1].substr(0, 'https://'.length) == 'https://') {protocol = https;} if(protocol) {protocol.get(url.parse(data.messageARGS[1], true), function(res) {var resData = ''; res.setEncoding('utf8'); res.on('data', function (chunk) {resData += chunk;}); res.on('end', function () {if(resData.length < pluginSettings.command_request_maxBytes){bot.ircSendCommandPRIVMSG(resData, data.responseTarget);}});}).on('error', function(e) {bot.ircSendCommandPRIVMSG("Got error: "+e.message, data.responseTarget);});}},
-		ping: function (data) {plugin.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status, info) {var statusString; if(status){statusString="open";}else{statusString="closed";}bot.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString+", "+(bot.isNumeric(info)?info+"ms":info), data.responseTarget);});},
-		nbot: function (data) {bot.ircSendCommandPRIVMSG("I'm a random bot written for fun, you can see my code here: http://git.mindcraft.si.eu.org/?p=nBot.git", data.responseTarget);},
-		help: function (data) {if(data.messageARGS[1] !== undefined){bot.ircSendCommandPRIVMSG(plugin.commandHelp("commandInfo", data.messageARGS[1]), data.responseTarget);}else{bot.ircSendCommandPRIVMSG(plugin.getHelp(), data.responseTarget);}},
-		away: function (data) {bot.ircUpdateUsersInChannel(data.responseTarget, function (userData) {var ircGoneUsersString = "", user; userData = userData[data.responseTarget]; for (user in userData) {if (!userData[user].isHere) {ircGoneUsersString +=user+", ";}} bot.ircSendCommandPRIVMSG("Away users are: "+ircGoneUsersString.replace(/, $/, ".").replace(/^$/, 'No users are away.'), data.responseTarget);});},
-		userlist: function (data) {if (data.messageARGS[1] == 'update') {bot.ircUpdateUsersInChannel(data.responseTarget);} else if (data.messageARGS[1] == 'count') {bot.ircSendCommandPRIVMSG(Object.keys(ircChannelUsers[data.responseTarget]).length, data.responseTarget);} else {var nickList = '', nickTotal = 0, channelUsersObj = ircChannelUsers[data.responseTarget]; for (var user in channelUsersObj) {nickList += bot.ircModePrefixConvert('prefix', channelUsersObj[user].mode)+user+', '; nickTotal++;} nickList = nickList.replace(/, $/, ". "); nickList += '(Nick total: '+nickTotal+')'; bot.ircSendCommandPRIVMSG(nickList, data.responseTarget);}},
-		origin: function (data) {if (plugin.commandsObject[data.messageARGS[1]] !== undefined) {bot.ircSendCommandPRIVMSG('Command "'+data.messageARGS[1]+'" is from plugin "'+plugin.getCommandOrigin(data.messageARGS[1])+'"', data.responseTarget);}},
-		raw: function (data) {if(plugin.isOp(data.nick) === true) {bot.ircWriteData(data.messageARGS[1]);}},
-		savesettings: function (data) {if(plugin.isOp(data.nick) === true) {bot.botSettingsSave(null, null, function () {bot.ircSendCommandPRIVMSG('Settings saved!', data.responseTarget);});}},
-		join: function (data) {if(plugin.isOp(data.nick) === true) {settings.channels.arrayValueAdd(data.messageARGS[1]);}},
-		part: function (data) {if(plugin.isOp(data.nick) === true) {settings.channels.arrayValueRemove(data.messageARGS[1]);bot.ircSendCommandPART(data.messageARGS[1], data.messageARGS[2]);} else if (plugin.isChanOp(data.nick, data.responseTarget) === true && pluginSettings.opUsers_commandsAllowChanOp) {settings.channels.arrayValueRemove(data.responseTarget);bot.ircSendCommandPART(data.responseTarget);}},
-		login: function (data) {bot.ircSendCommandPRIVMSG(plugin.authenticateOp(data.nick, data.messageARGS[1]), data.responseTarget);},
-		logout: function (data) {bot.ircSendCommandPRIVMSG(plugin.deAuthenticateOp(data.nick), data.responseTarget);},
-		op: function (data) {if(plugin.isOp(data.nick) === true) {bot.ircSendCommandPRIVMSG(plugin.giveOp(data.messageARGS[1], data.messageARGS[2]), data.responseTarget);}},
-		deop: function (data) {if(plugin.isOp(data.nick) === true) {bot.ircSendCommandPRIVMSG(plugin.takeOp(data.messageARGS[1]), data.responseTarget);}},
-		helpall: function (data) {bot.ircSendCommandPRIVMSG(plugin.getHelpAll(), data.nick);},
-		responseadd: function (data) {if(plugin.isOp(data.nick) === true) {pluginSettings.specificResponses[data.messageARGS[1]]=data.messageARGS[2];}},
-		responseremove: function (data) {if(plugin.isOp(data.nick) === true) {delete pluginSettings.specificResponses[data.messageARGS[1]];}},
-		responselist: function (data) {if(plugin.isOp(data.nick) === true) {var specificResponseList=""; for (var specificResponse in pluginSettings.specificResponses) {specificResponseList+="\""+specificResponse+"\", ";}bot.ircSendCommandPRIVMSG("Current responses are: "+specificResponseList.replace(/, $/, ".").replace(/^$/, 'No responses found.'), data.responseTarget);}},
-		reponseclear: function (data) {if(plugin.isOp(data.nick) === true) {pluginSettings.specificResponses = {};}},
-		functionadd: function (data) {if(plugin.isOp(data.nick) === true) {pluginSettings.dynamicFunctions[data.messageARGS[1]]=data.messageARGS[2];}},
-		functionremove: function (data) {if(plugin.isOp(data.nick) === true) {delete pluginSettings.dynamicFunctions[data.messageARGS[1]];}},
-		functionlist: function (data) {if(plugin.isOp(data.nick) === true) {var dynamicFunctionList=""; for (var dynamicFunction in pluginSettings.dynamicFunctions) {dynamicFunctionList+="\""+dynamicFunction+"\", ";}bot.ircSendCommandPRIVMSG("Current functions are: "+dynamicFunctionList.replace(/, $/, ".").replace(/^$/, 'No dynamic functions found.'), data.responseTarget);}},
-		functionshow: function (data) {if(plugin.isOp(data.nick) === true) {var dynamicFunction; if ((dynamicFunction = pluginSettings.dynamicFunctions[data.messageARGS[1]]) !== undefined) {bot.ircSendCommandPRIVMSG(dynamicFunction, data.responseTarget);}else{bot.ircSendCommandPRIVMSG("Error: Function not found", data.responseTarget);}}},
-		pluginreload: function (data) {if(plugin.isOp(data.nick) === true) {if (bot.plugins[data.messageARGS[1]]) {bot.botPluginDisable(data.messageARGS[1]);bot.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');}}},
-		pluginreloadall: function (data) {function pluginReload(id) {bot.botPluginDisable(id);bot.botPluginLoad(id, settings.pluginDir+'/'+id+'.js');} if(plugin.isOp(data.nick) === true) {pluginReload(pluginId); for (var id in bot.plugins) {if (id != pluginId && id != 'simpleMsg') {pluginReload(id);}}}},
-		evaljs: function (data) {if(plugin.isOp(data.nick) === true) {eval("(function () {"+data.messageARGS[1]+"})")();}},
-		pluginload: function (data) {if(plugin.isOp(data.nick) === true) {bot.botPluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');settings.plugins.arrayValueAdd(data.messageARGS[1]);}},
-		plugindisable: function (data) {if(plugin.isOp(data.nick) === true) {bot.botPluginDisable(data.messageARGS[1]);settings.plugins.arrayValueRemove(data.messageARGS[1]);}},
-		date: function (data) {var date = ''; switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'UTC': date = new Date().toUTCString(); break; case 'ISO': date = new Date().toISOString(); break; case 'UNIX': date = Math.round(new Date().getTime() / 1000); break; default: date = new Date();} bot.ircSendCommandPRIVMSG(date, data.responseTarget);},
-		sh: function (data) {var shell_arguments = ''; for (var i in data.messageARGS) {if (i > 0) {shell_arguments += ' '+data.messageARGS[i];}} shell_arguments=shell_arguments.substr(1); if(plugin.isOp(data.nick) === true) {exec(shell_arguments, {shell: '/bin/bash'}, function(error, stdout, stderr){bot.ircSendCommandPRIVMSG(stdout.replace(/\n/g, ' ;; '), data.responseTarget);});}},
-		binary: function (data) {var response = '', strArr, i, message = ''; for (i in data.messageARGS) {if (i > 1) {message += ' '+data.messageARGS[i];}} message=message.substr(1); switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {case 'ENCODE': strArr = message.split(''); for (i in strArr) {response += ' '+('0000000'+parseInt(new Buffer(strArr[i].toString(), 'utf8').toString('hex'), 16).toString(2)).slice(-8);} response=response.substr(1); break; case 'DECODE': message=message.split(' ').join(''); i=0; while (8*(i+1) <= message.length) {response += new Buffer(parseInt(message.substr(8*i, 8), 2).toString(16), 'hex').toString('utf8'); i++;}} bot.ircSendCommandPRIVMSG(response, data.responseTarget);}
+	evaljs: function (data) {
+		if (plugin.isOp(data.nick) === true) {
+			eval("(function () {"+data.messageARGS[1]+"})")();
+		}
 	},
-	
-	//bot pluggable functions object
-	pluggableFunctionObject: {
-		whereis: function (data) {var commandArgsWhereis; if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.message)) !== null) {bot.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){var channels = ''; for (var line in whoisData[1]) {if (whoisData[1][line][2] == 319) {channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');}} var channelArray = channels.split(' '); channels = channelArray.join(' '); bot.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);});}},
-		hi: function (data) {if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {bot.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);}},
-		ctcpVersion: function (data) {if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {bot.ircSendCommandNOTICE("\x01VERSION nBot v0.2.3.7\x01", data.nick);}},
-		ctcpPing: function (data) {var timestamp; if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {bot.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.nick);}},
-		ctcpTime: function (data) {if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {bot.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);}},
-		ctcpClientinfo: function (data) {if (new RegExp('\x01CLIENTINFO\x01', 'g').exec(data.message) !== null) {bot.ircSendCommandNOTICE("\x01CLIENTINFO VERSION PING TIME CLIENTINFO SOURCE\x01", data.nick);}},
-		ctcpSource: function (data) {if (new RegExp('\x01SOURCE\x01', 'g').exec(data.message) !== null) {bot.ircSendCommandNOTICE("\x01SOURCE https://phabricator.mindcraft.si.eu.org/diffusion/NBOT/\x01", data.nick);}}
+	pluginload: function (data) {
+		if (plugin.isOp(data.nick) === true) {
+			bot.pluginLoad(data.messageARGS[1], settings.pluginDir+'/'+data.messageARGS[1]+'.js');
+			settings.plugins.push(data.messageARGS[1]);
+		}
+	},
+	plugindisable: function (data) {
+		if (plugin.isOp(data.nick) === true) {
+			bot.pluginDisable(data.messageARGS[1]);
+			bot.arrRm(settings.plugins, data.messageARGS[1]);
+		}
+	},
+	date: function (data) {
+		var date = '';
+		switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {
+			case 'UTC': date = new Date().toUTCString(); break;
+			case 'ISO': date = new Date().toISOString(); break;
+			case 'UNIX': date = Math.round(new Date().getTime() / 1000); break;
+			default: date = new Date();
+		}
+		bot.ircSendCommandPRIVMSG(date, data.responseTarget);
+	},
+	sh: function (data) {
+		var shell_arguments = '';
+		for (var i in data.messageARGS) {
+			if (i > 0) {
+				shell_arguments += ' '+data.messageARGS[i];
+			}
+		}
+		shell_arguments=shell_arguments.substr(1);
+		if (plugin.isOp(data.nick) === true) {
+			exec(shell_arguments, {shell: '/bin/bash'}, function(error, stdout, stderr){
+				bot.ircSendCommandPRIVMSG(stdout.replace(/\n/g, ' ;; '), data.responseTarget);
+			});
+		}
+	},
+	binary: function (data) {
+		var response = '', strArr, i, message = '';
+		for (i in data.messageARGS) {
+			if (i > 1) {
+				message += ' '+data.messageARGS[i];
+			}
+		}
+		message=message.substr(1);
+		switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {
+			case 'ENCODE':
+				strArr = message.split('');
+				for (i in strArr) {
+					response += ' '+('0000000'+parseInt(new Buffer(strArr[i].toString(), 'utf8').toString('hex'), 16).toString(2)).slice(-8);
+				}
+				response=response.substr(1);
+				break;
+			case 'DECODE':
+				message=message.split(' ').join('');
+				i=0;
+				while (8*(i+1) <= message.length) {
+					response += new Buffer(parseInt(message.substr(8*i, 8), 2).toString(16), 'hex').toString('utf8'); i++;
+				}
+				break;
+		}
+		bot.ircSendCommandPRIVMSG(response, data.responseTarget);
+	}
+};
+
+//bot pluggable functions object
+plugin.pluggableFunctionObject = {
+	whereis: function (data) {
+		var commandArgsWhereis;
+		if ((commandArgsWhereis = new RegExp('^'+pluginSettings.commandPrefix+'where(?:.*)*?(?=is)is ([^ ]*)', 'g').exec(data.message)) !== null) {
+			bot.ircSendCommandWHOIS(commandArgsWhereis[1], function(whoisData){
+				var channels = '';
+				for (var line in whoisData[1]) {
+					if (whoisData[1][line][2] == 319) {
+						channels += whoisData[1][line][5].replace(/[^ #]{0,1}#/g, '#');
+					}
+				}
+				var channelArray = channels.split(' ');
+				channels = channelArray.join(' ');
+				bot.ircSendCommandPRIVMSG(commandArgsWhereis[1]+' is on: '+channels.replace(/^$/, 'User not found on any channel'), data.responseTarget);
+			});
+		}
+	},
+	hi: function (data) {
+		if (new RegExp('(Hi|Hello|Hey|Hai) '+settings.botName, 'gi').exec(data.message) !== null) {
+			bot.ircSendCommandPRIVMSG('Hi '+data.nick, data.responseTarget);
+		}
+	},
+	ctcpVersion: function (data) {
+		if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {
+			bot.ircSendCommandNOTICE("\x01VERSION nBot v0.3.1.0\x01", data.nick);
+		}
+	},
+	ctcpPing: function (data) {
+		var timestamp;
+		if ((timestamp = new RegExp('\x01PING ([^\x01]*)\x01', 'g').exec(data.message)) !== null) {
+			bot.ircSendCommandNOTICE("\x01PING "+timestamp[1]+"\x01", data.nick);
+		}
+	},
+	ctcpTime: function (data) {
+		if (new RegExp('\x01TIME\x01', 'g').exec(data.message) !== null) {
+			bot.ircSendCommandNOTICE("\x01TIME "+new Date()+"\x01", data.nick);
+		}
+	},
+	ctcpClientinfo: function (data) {
+		if (new RegExp('\x01CLIENTINFO\x01', 'g').exec(data.message) !== null) {
+			bot.ircSendCommandNOTICE("\x01CLIENTINFO VERSION PING TIME CLIENTINFO SOURCE\x01", data.nick);
+		}
+	},
+	ctcpSource: function (data) {
+		if (new RegExp('\x01SOURCE\x01', 'g').exec(data.message) !== null) {
+			bot.ircSendCommandNOTICE("\x01SOURCE https://phab.plfgr.eu.org/diffusion/NBOT/\x01", data.nick);
+		}
 	}
 };
 
@@ -526,8 +812,17 @@ module.exports.ready = false;
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		//make sure operator list is clean if new connection is made
-		case 'botPluginDisableEvent': if (pluginSettings.disabledPluginRemoveCommands) {plugin.commandsRemoveByOrigin(event.eventData);} break;
-		case 'botPluginReadyEvent': if (event.eventData == 'simpleMsg') {plugin.utilizeSimpleMsg();} break;
+		case 'botPluginDisableEvent':
+			if (event.eventData == pluginId) {pluginDisabled = true;}
+			if (pluginSettings.disabledPluginRemoveCommands) {
+				plugin.commandsRemoveByOrigin(event.eventData);
+			}
+			break;
+		case 'botPluginReadyEvent':
+			if (event.eventData == 'simpleMsg') {
+				plugin.utilizeSimpleMsg();
+			}
+			break;
 	}
 };
 
@@ -544,7 +839,7 @@ module.exports.main = function (i, b) {
 	if (pluginSettings === undefined) {
 		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[pluginId] = pluginSettings;
-		bot.botSettingsSave();
+		bot.im.settingsSave();
 	}
 	
 	//check and utilize dependencies

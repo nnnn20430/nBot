@@ -27,15 +27,6 @@ var pluginSettings;
 var ircChannelUsers;
 
 //variables
-var http = require('http');
-var net = require('net');
-var fs = require('fs');
-var util = require('util');
-var events = require('events');
-var exec = require('child_process').exec;
-var path = require('path');
-var vm = require('vm');
-
 var pluginDisabled = false;
 
 //settings constructor
@@ -43,7 +34,7 @@ var SettingsConstructor = function (modified) {
 	var settings, attrname;
 	if (this!==SettingsConstructor) {
 		settings = {
-			templateSetting: true
+			botUpdateInterval: 10000
 		};
 		for (attrname in modified) {settings[attrname]=modified[attrname];}
 		return settings;
@@ -51,8 +42,21 @@ var SettingsConstructor = function (modified) {
 };
 
 //main plugin object
-var plugin = {
-	//put all your functions here
+var plugin = {};
+
+plugin.botIrcConnectionRegisteredHandle = function() {
+	var botUpdateInterval;
+	bot.ircBotUpdateSelf();
+	botUpdateInterval = setInterval(function () {
+		if (!pluginDisabled) {
+			bot.ircBotUpdateSelf();
+		} else {
+			clearInterval(botUpdateInterval);
+		}
+	}, pluginSettings.botUpdateInterval||10000);
+	bot.ircConnection.once('close', function() {
+		clearInterval(botUpdateInterval);
+	});
 };
 
 //exports
@@ -67,6 +71,9 @@ module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
 			if (event.eventData == pluginId) {pluginDisabled = true;}
+			break;
+		case 'botIrcConnectionRegistered':
+			plugin.botIrcConnectionRegisteredHandle();
 			break;
 	}
 };
@@ -85,6 +92,12 @@ module.exports.main = function (i, b) {
 		pluginSettings = new SettingsConstructor();
 		settings.pluginsSettings[pluginId] = pluginSettings;
 		bot.im.settingsSave();
+	}
+	
+	//if loaded after connection has already registered
+	//make sure the handle runs
+	if (bot.ircConnectionRegistered) {
+		plugin.botIrcConnectionRegisteredHandle();
 	}
 	
 	//plugin is ready

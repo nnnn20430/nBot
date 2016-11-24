@@ -30,30 +30,31 @@ var ircChannelUsers;
 var pluginDisabled = false;
 
 //main plugin object
-var plugin = {
-	handleNewConnection: function (c) {
-		c.setTimeout(60*1000);
-		c.on('error', function (e) {
-			if (!pluginDisabled) {
-				c.end();
-				c.destroy();
-			}
-		});
-		c.on('timeout', function (e) {
-			if (!pluginDisabled) {
-				c.end();
-				c.destroy();
-			}
-		});
-		c.on('close', function() {
-			if (!pluginDisabled) {
-				setTimeout(function() {
-					if (!pluginDisabled) {bot.init();}
-				}, 3000);
-			}
-		});
-	},
+var plugin = {};
+
+plugin.botIrcConnectionCreatedHandle = function (c) {
+	c.setTimeout(60*1000);
+	c.on('error', function (e) {
+		if (!pluginDisabled) {
+			c.end();
+			c.destroy();
+		}
+	});
+	c.on('timeout', function (e) {
+		if (!pluginDisabled) {
+			c.end();
+			c.destroy();
+		}
+	});
+	c.on('close', function() {
+		if (!pluginDisabled) {
+			setTimeout(function() {
+				if (!pluginDisabled) {bot.init();}
+			}, 3000);
+		}
+	});
 };
+
 
 //exports
 module.exports.plugin = plugin;
@@ -65,7 +66,7 @@ module.exports.ready = false;
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botIrcConnectionCreated':
-			plugin.handleNewConnection(event.eventData);
+			plugin.botIrcConnectionCreatedHandle(event.eventData);
 			break;
 		case 'botPluginDisableEvent':
 			if (event.eventData == pluginId) {pluginDisabled = true;}
@@ -81,6 +82,12 @@ module.exports.main = function (i, b) {
 	settings = bot.options;
 	pluginSettings = settings.pluginsSettings[pluginId];
 	ircChannelUsers = bot.ircChannelUsers;
+	
+	//if loaded after connection has already been created/registered
+	//make sure the handle runs
+	if (bot.ircConnectionRegistered) {
+		plugin.botIrcConnectionCreatedHandle(bot.ircConnection);
+	}
 	
 	//plugin is ready
 	exports.ready = true;
