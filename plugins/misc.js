@@ -18,19 +18,11 @@
 "use strict";
 //reserved nBot variables
 var bot;
-var pluginId;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var pId;
+var options;
+var pOpts;
 
 //variables
-var http = require('http');
-var net = require('net');
-var fs = require('fs');
-var util = require('util');
-var events = require('events');
-var exec = require('child_process').exec;
-var path = require('path');
 var dgram = require('dgram');
 
 var pluginDisabled = false;
@@ -64,17 +56,17 @@ plugin.hostHistoryData = {};
 
 //initialize enabled misc features
 plugin.miscFeatureInit = function () {
-	if (pluginSettings.birthdays) {plugin.birthdaysInit();}
-	if (pluginSettings.statistics) {plugin.channelMessageStatisticsInit();}
-	if (pluginSettings.hostnameHistory) {plugin.hostnameHistoryInit();}
+	if (pOpts.birthdays) {plugin.birthdaysInit();}
+	if (pOpts.statistics) {plugin.channelMessageStatisticsInit();}
+	if (pOpts.hostnameHistory) {plugin.hostnameHistoryInit();}
 };
 
 //pass messages to enabled features
 plugin.mainMiscMsgHandle = function (data) {
-	if (pluginSettings.mathHelper) {plugin.tryArithmeticEquation(data);}
-	if (pluginSettings.birthdays && pluginSettings.birthdaysRemindOnActivity) {plugin.birthdaysRemindCheck(data);}
-	if (pluginSettings.statistics) {plugin.channelMessageStatisticsTrack(data);}
-	if (pluginSettings.hostnameHistory) {plugin.hostnameHistoryTrack(data);}
+	if (pOpts.mathHelper) {plugin.tryArithmeticEquation(data);}
+	if (pOpts.birthdays && pOpts.birthdaysRemindOnActivity) {plugin.birthdaysRemindCheck(data);}
+	if (pOpts.statistics) {plugin.channelMessageStatisticsTrack(data);}
+	if (pOpts.hostnameHistory) {plugin.hostnameHistoryTrack(data);}
 };
 
 //try if the message is artithmetic equation ending with a "=" char
@@ -170,8 +162,8 @@ plugin.birthdaysInit = function () {
 		var user = data.messageARGS[1];
 		var bdaySec, bday, nextbday, nextbdayString, bdayIsToday = false;
 		var date = Math.round(new Date().getTime()/1000);
-		if (pluginSettings.birthdayData[user]) {
-			bdaySec = +pluginSettings.birthdayData[user];
+		if (pOpts.birthdayData[user]) {
+			bdaySec = +pOpts.birthdayData[user];
 			bday = new Date(); bday.setTime(bdaySec*1000);
 			if (Math.round(new Date(bday).setFullYear(new Date().getFullYear())/1000) > date) {
 				nextbday = Math.round(new Date(bday).setFullYear(new Date().getFullYear())/1000);
@@ -184,52 +176,52 @@ plugin.birthdaysInit = function () {
 			}
 			bot.ircSendCommandPRIVMSG('Born on: '+bday.getFullYear()+' '+(bday.getMonth() + 1)+' '+bday.getDate()+', next birthday in: '+nextbdayString+', birthday today: '+(bdayIsToday?'yes':'no')+'.', data.responseTarget);
 		}
-	}, 'bday "user": get date of known users birthday', pluginId);
+	}, 'bday "user": get date of known users birthday', pId);
 	
 	commandsPlugin.commandAdd('bdayadd', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.birthdaysCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.birthdaysCommandsOpOnly) {
 			var user = data.messageARGS[1];
 			var date = new Date(data.messageARGS[2]);
 			if (bot.isNumeric(date.getTime())) {
-				pluginSettings.birthdayData[user] = Math.round(date.getTime()/1000);
+				pOpts.birthdayData[user] = Math.round(date.getTime()/1000);
 			}
 		}
-	}, 'bdayadd "user" "date": add new birthday', pluginId);
+	}, 'bdayadd "user" "date": add new birthday', pId);
 	
 	commandsPlugin.commandAdd('bdayremove', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.birthdaysCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.birthdaysCommandsOpOnly) {
 			var user = data.messageARGS[1];
-			if (pluginSettings.birthdayData[user]) {
-				delete pluginSettings.birthdayData[user];
+			if (pOpts.birthdayData[user]) {
+				delete pOpts.birthdayData[user];
 			}
 		}
-	}, 'bdayremove "user": remove a existing birthday', pluginId);
+	}, 'bdayremove "user": remove a existing birthday', pId);
 	
 	commandsPlugin.commandAdd('bdayuserlist', function (data) {
 		var bdayUserList = "";
-		for (var user in pluginSettings.birthdayData) {
+		for (var user in pOpts.birthdayData) {
 			bdayUserList+="\""+user+"\", ";
 		}
 		bot.ircSendCommandPRIVMSG("Known users are: "+bdayUserList.replace(/, $/, ".").replace(/^$/, 'No known users.'), data.responseTarget);
-	}, 'bdayuserlist: list known birthday users', pluginId);
+	}, 'bdayuserlist: list known birthday users', pId);
 	
 	commandsPlugin.commandAdd('age', function (data) {
 		var user = data.messageARGS[1];
 		var bdaySec, bday, age;
 		var dateSec = Math.round(new Date().getTime()/1000);
-		if (pluginSettings.birthdayData[user]) {
-			bdaySec = +pluginSettings.birthdayData[user];
+		if (pOpts.birthdayData[user]) {
+			bdaySec = +pOpts.birthdayData[user];
 			age = plugin.parsedSecondsToString(plugin.parseSeconds(dateSec-bdaySec));
 			bot.ircSendCommandPRIVMSG('Age of "'+user+'": '+age, data.responseTarget);
 		}
-	}, 'age "user": known users age', pluginId);
+	}, 'age "user": known users age', pId);
 };
 
 //birthdays remind check
 plugin.birthdaysRemindCheck = function (data) {
 	var bdaySec, bday;
-	for (var user in pluginSettings.birthdayData) {
-		bdaySec = +pluginSettings.birthdayData[user];
+	for (var user in pOpts.birthdayData) {
+		bdaySec = +pOpts.birthdayData[user];
 		bday = new Date(); bday.setTime(bdaySec*1000);
 		if ((bday.getMonth() === new Date().getMonth()) && (bday.getDate() == new Date().getDate())) {
 			if (!plugin.birthdaysRemindCheckTrackerObj[user]) {
@@ -263,7 +255,7 @@ plugin.channelMessageStatisticsInit = function () {
 		if (message) {
 			bot.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
 		}
-	}, 'msgstat: prints users percentage of messages in channel', pluginId);
+	}, 'msgstat: prints users percentage of messages in channel', pId);
 };
 
 //channel message statistics
@@ -553,7 +545,7 @@ plugin.hostnameHistoryInit = function () {
 		if (message != 'Known nicknames for host: ') {
 			bot.ircSendCommandPRIVMSG(message.replace(/, $/, "."), data.responseTarget);
 		}
-	}, 'hosthistory "hostname": prints list of known nicknames associated with the hostname', pluginId);
+	}, 'hosthistory "hostname": prints list of known nicknames associated with the hostname', pId);
 };
 
 //keep track of hostnames
@@ -584,24 +576,24 @@ plugin.pluginReadyCheck = function () {
 	) {
 		//plugin is ready
 		exports.ready = true;
-		bot.emitBotEvent('botPluginReadyEvent', pluginId);
+		bot.emitBotEvent('botPluginReadyEvent', pId);
 	}
 };
 
 //add listeners to simpleMsg plugin
 plugin.utilizeSimpleMsg = function () {
 	var simpleMsg = bot.plugins.simpleMsg.plugin;
-	simpleMsg.msgListenerAdd(pluginId, 'PRIVMSG', function (data) {
+	simpleMsg.msgListenerAdd(pId, 'PRIVMSG', function (data) {
 		plugin.mainMiscMsgHandle(data);
 	});
 	
-	simpleMsg.msgListenerAdd(pluginId, 'PART', function (data) {
+	simpleMsg.msgListenerAdd(pId, 'PART', function (data) {
 		if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
 			delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 		}
 	});
 	
-	simpleMsg.msgListenerAdd(pluginId, 'QUIT', function (data) {
+	simpleMsg.msgListenerAdd(pId, 'QUIT', function (data) {
 		for (var i in data.channels) {
 			if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
 				delete plugin.channelMessageStatisticsObj[data.channels[i]][data.nick];
@@ -609,7 +601,7 @@ plugin.utilizeSimpleMsg = function () {
 		}
 	});
 	
-	simpleMsg.msgListenerAdd(pluginId, 'NICK', function (data) {
+	simpleMsg.msgListenerAdd(pId, 'NICK', function (data) {
 		for (var i in data.channels) {
 			if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
 				plugin.channelMessageStatisticsObj[data.channels[i]][data.newnick] =  plugin.channelMessageStatisticsObj[data.channels[i]][data.nick];
@@ -618,7 +610,7 @@ plugin.utilizeSimpleMsg = function () {
 		}
 	});
 	
-	simpleMsg.msgListenerAdd(pluginId, 'KICK', function (data) {
+	simpleMsg.msgListenerAdd(pId, 'KICK', function (data) {
 		if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
 			delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 		}
@@ -633,25 +625,25 @@ plugin.utilizeCommands = function () {
 	commandsPlugin.commandAdd('parseseconds', function (data) {
 		var parsedTime = plugin.parseSeconds(data.messageARGS[1]);
 		bot.ircSendCommandPRIVMSG(plugin.parsedSecondsToString(parsedTime), data.responseTarget);
-	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pluginId);
+	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pId);
 	
 	commandsPlugin.commandAdd('parsetime', function (data) {
 		var parsedTime = plugin.parseTimeToSeconds(data.messageARGS[1]);
 		bot.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
-	}, 'parsetime "time": parse "y d h m s" to seconds', pluginId);
+	}, 'parsetime "time": parse "y d h m s" to seconds', pId);
 	
 	commandsPlugin.commandAdd('sendwol', function (data) {
 		plugin.sendWoL(data.messageARGS[1], data.messageARGS[2]);
-	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pluginId);
+	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pId);
 	
 	commandsPlugin.commandAdd('convert', function (data) {
 		var convertedValue;
 		bot.ircSendCommandPRIVMSG((convertedValue = plugin.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
-	}, 'convert "from" "to" "value": convert value to another', pluginId);
+	}, 'convert "from" "to" "value": convert value to another', pId);
 	
 	commandsPlugin.commandAdd('1337', function (data) {
 		bot.ircSendCommandPRIVMSG(plugin.strTo1337(data.messageARGS[1]), data.responseTarget);
-	}, '1337 "text": convert text to 1337 text', pluginId);
+	}, '1337 "text": convert text to 1337 text', pId);
 	
 	commandsPlugin.commandAdd('countdown', function (data) {
 		var timeoutId;
@@ -683,22 +675,22 @@ plugin.utilizeCommands = function () {
 				bot.ircSendCommandPRIVMSG('Time left: '+plugin.parsedSecondsToString(parsedTime), data.responseTarget);
 				break;
 		}
-	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pluginId);
+	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pId);
 	
 	commandsPlugin.commandAdd('reverse', function (data) {
 		var txt = data.messageARGS[1], txtr = '';
 		var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
 		bot.ircSendCommandPRIVMSG(txtr, data.responseTarget);
-	}, 'reverse "text": reverse text', pluginId);
+	}, 'reverse "text": reverse text', pId);
 	
 	commandsPlugin.commandAdd('randomnumber', function (data) {
 		bot.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
-	}, 'randomnumber "min" "max": print random number', pluginId);
+	}, 'randomnumber "min" "max": print random number', pId);
 	
 	commandsPlugin.commandAdd('uptime', function (data) {
 		var upTime = plugin.parseSeconds(Math.round(process.uptime()));
 		bot.ircSendCommandPRIVMSG('Uptime: '+plugin.parsedSecondsToString(upTime), data.responseTarget);
-	}, 'uptime: print time passed since nBot process was started', pluginId);
+	}, 'uptime: print time passed since nBot process was started', pId);
 	
 	plugin.pluginReadyCheck();
 };
@@ -714,7 +706,7 @@ module.exports.ready = false;
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
-			if (event.eventData == pluginId) {pluginDisabled = true;}
+			if (event.eventData == pId) {pluginDisabled = true;}
 			(function () {
 				for (var countdown in plugin.countdownDataObj) {
 					clearTimeout(plugin.countdownDataObj[countdown][0]);
@@ -735,21 +727,20 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (i, b) {
 	//update variables
 	bot = b;
-	pluginId = i;
-	settings = bot.options;
-	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = bot.ircChannelUsers;
-	
+	pId = i;
+	options = bot.options;
+	pOpts = options.pluginsSettings[pId];
+
 	//if plugin settings are not defined, define them
-	if (pluginSettings === undefined) {
-		pluginSettings = new SettingsConstructor();
-		settings.pluginsSettings[pluginId] = pluginSettings;
+	if (pOpts === undefined) {
+		pOpts = new SettingsConstructor();
+		options.pluginsSettings[pId] = pOpts;
 		bot.im.settingsSave();
 	}
-	
+
 	//call main feature controlling function
 	plugin.miscFeatureInit();
-	
+
 	//check and utilize dependencies
 	if (bot.plugins.simpleMsg &&
 	bot.plugins.simpleMsg.ready) {

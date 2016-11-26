@@ -18,20 +18,11 @@
 "use strict";
 //reserved nBot variables
 var bot;
-var pluginId;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var pId;
+var options;
+var pOpts;
 
 //variables
-var http = require('http');
-var net = require('net');
-var fs = require('fs');
-var util = require('util');
-var events = require('events');
-var exec = require('child_process').exec;
-var path = require('path');
-
 var pluginDisabled = false;
 
 //settings constructor
@@ -62,7 +53,7 @@ plugin.msgEmit = function (name, data) {
 				try {
 					plugin.msgListenerObj[id][name][handle](data);
 				} catch (e) {
-					bot.log('Error when emitting "'+name+'" event to listener "'+id+'":'+(settings.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
+					bot.log('Error when emitting "'+name+'" event to listener "'+id+'":'+(options.errorsIncludeStack?('\n'+e.stack):(' ('+e+')')));
 				}
 			}
 		}
@@ -163,8 +154,8 @@ plugin.msgParseQUIT = function (data, callback) {
 	var nick = data[1][0];
 	var reason = data[5]||data[4][0];
 	var channels = [];
-	for (var channel in ircChannelUsers) {
-		if (ircChannelUsers[channel][nick] !== undefined) {
+	for (var channel in bot.ircChannelUsers) {
+		if (bot.ircChannelUsers[channel][nick] !== undefined) {
 			channels.push(channel);
 		}
 	}
@@ -208,8 +199,8 @@ plugin.msgParseNICK = function (data, callback) {
 	var nick = data[1][0];
 	var newnick = data[5]||data[4][0];
 	var channels = [];
-	for (var channel in ircChannelUsers) {
-		if (ircChannelUsers[channel][nick] !== undefined) {
+	for (var channel in bot.ircChannelUsers) {
+		if (bot.ircChannelUsers[channel][nick] !== undefined) {
 			channels.push(channel);
 		}
 	}
@@ -253,8 +244,8 @@ plugin.msgParseKILL = function (data, callback) {
 	var nick = data[1][0];
 	var reason = data[5]||data[4][0];
 	var channels = [];
-	for (var channel in ircChannelUsers) {
-		if (ircChannelUsers[channel][nick] !== undefined) {
+	for (var channel in bot.ircChannelUsers) {
+		if (bot.ircChannelUsers[channel][nick] !== undefined) {
 			channels.push(channel);
 		}
 	}
@@ -386,8 +377,8 @@ module.exports.botEvent = function (event) {
 	}
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
-			if (event.eventData == pluginId) {pluginDisabled = true;}
-			if (pluginSettings.disabledPluginRemoveListeners) {
+			if (event.eventData == pId) {pluginDisabled = true;}
+			if (pOpts.disabledPluginRemoveListeners) {
 				plugin.msgListenerRemove(event.eventData);
 			}
 			break;
@@ -401,19 +392,18 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (i, b) {
 	//update variables
 	bot = b;
-	pluginId = i;
-	settings = bot.options;
-	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = bot.ircChannelUsers;
-	
+	pId = i;
+	options = bot.options;
+	pOpts = options.pluginsSettings[pId];
+
 	//if plugin settings are not defined, define them
-	if (pluginSettings === undefined) {
-		pluginSettings = new SettingsConstructor();
-		settings.pluginsSettings[pluginId] = pluginSettings;
+	if (pOpts === undefined) {
+		pOpts = new SettingsConstructor();
+		options.pluginsSettings[pId] = pOpts;
 		bot.im.settingsSave();
 	}
-	
+
 	//plugin is ready
 	exports.ready = true;
-	bot.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pId);
 };

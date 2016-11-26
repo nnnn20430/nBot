@@ -17,11 +17,7 @@
 
 "use strict";
 //variables
-var net = require('net');
-var tls = require('tls');
 var fs = require('fs');
-var events = require('events');
-var path = require('path');
 
 var Bot = require(__dirname+'/lib/bot');
 var Shell = require(__dirname+'/lib/shell');
@@ -88,6 +84,7 @@ im.SettingsConstructor = {
 	}
 };
 
+//handle uncaught exceptions
 im.uncaughtExceptionHandle = function (err) {
 	console.log(err.stack);
 	console.log('An uncaught exception occurred please report this.');
@@ -98,6 +95,7 @@ im.uncaughtExceptionHandle = function (err) {
 	}
 };
 
+//load settings
 im.settingsLoad = function (file, callback) {
 	file = file||"settings.json";
 	var s, c;
@@ -127,6 +125,7 @@ im.settingsLoad = function (file, callback) {
 	}
 };
 
+//save settings
 im.settingsSave = function (file, data, callback) {
 	file = file||"settings.json";
 	data = data||im.options;
@@ -142,6 +141,7 @@ im.settingsSave = function (file, data, callback) {
 	}
 };
 
+//kill one bot instance using iId
 im.killInstance = function (iId, reason, force) {
 	force = (reason)?
 		((force)?true:false):
@@ -164,12 +164,14 @@ im.killInstance = function (iId, reason, force) {
 	}
 };
 
+//kill all bot instances
 im.killAllInstances = function (reason, force) {
 	for (var iId in im.iArr) {
 		im.killInstance(iId, reason, force);
 	}
 };
 
+//log using shell lib or directly to stdout
 im.log = function (data) {
 	if (im.options.logs) {
 		if (im.options.shellEnabled) {
@@ -180,74 +182,81 @@ im.log = function (data) {
 	}
 };
 
+//handle botReceivedPRIVMSG botEvent from bot instance
 im.botEventHandle_botReceivedPRIVMSG = function (iId, data) {
 	var nick = data[1][0],
-		to = data[4][0],
-		message = data[5]||data[4][1];
+	    to = data[4][0],
+	    message = data[5]||data[4][1];
 	var connectionName = im.iOpts[iId].connectionName||iId;
 	im.log('['+connectionName+':'+to+'] <'+nick+'>: '+message);
 };
 
+//handle botReceivedNOTICE botEvent from bot instance
 im.botEventHandle_botReceivedNOTICE = function (iId, data) {
 	var nick = data[1][0],
-		to = data[4][0],
-		message = data[5]||data[4][1];
+	    to = data[4][0],
+	    message = data[5]||data[4][1];
 	var connectionName = im.iOpts[iId].connectionName||iId;
 	im.log('[NOTICE('+connectionName+':'+to+')] <'+nick+'>: '+message);
 };
 
+//handle botEvent from bot instance
 im.botEventHandle = function (iId, event) {
 	if (im['botEventHandle_'+event.eventName] !== undefined) {
 		im['botEventHandle_'+event.eventName](iId, event.eventData);
 	}
 };
 
-//misc functions: handle debug message event from bot instance
+//handle log messages from bot instance
 im.botLogMessageHandle = function (iId, data) {
 	var connectionName = im.iOpts[iId].connectionName||iId;
 	im.log(connectionName+"-> "+data);
 };
 
+//init shell
 im.initShell = function () {
 	im.shell = new Shell(im);
 	im.shell.init();
 };
 
-//misc functions: start a nBot connection from settings using sequential id
+//create bot instance, from instance options, using instance id
 im.createInstance = function (iId) {
 	var bot = new Bot(im.iOpts[iId]);
 	var options = bot.options;
-	
+
+	//wrapper functions to preserve current scope (iID)
 	function botEventHandle(event) {
 		im.botEventHandle(iId, event);
 	}
-	
 	function botLogMessageHandle(data) {
 		im.botLogMessageHandle(iId, data);
 	}
-	
+
+	//add bot to im
 	im.iArr[iId] = bot;
-	
+
 	//expose instance manager
 	bot.im = im;
-	
+
 	//listen for events
 	bot.eventsAdd('botEvent', botEventHandle);
 	bot.eventsAdd('botLogMessage', botLogMessageHandle);
-	
+
 	//load plugins from settings
 	for (var plugin in im.iOpts[iId].plugins) {
 		bot.pluginLoad(options.plugins[plugin],
 			options.pluginDir+'/'+options.plugins[plugin]+'.js');
 	}
-	
+
+	//init bot
 	bot.init();
 };
 
+//entry point
 (function main(){
 	//handle uncaught errors
 	process.on('uncaughtException', im.uncaughtExceptionHandle);
-	
+
 	//load settings and start the bot
 	im.settingsLoad(null, function (data) {
 		im.options = data;

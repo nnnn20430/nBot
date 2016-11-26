@@ -18,10 +18,9 @@
 "use strict";
 //reserved nBot variables
 var bot;
-var pluginId;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var pId;
+var options;
+var pOpts;
 
 //variables
 var pluginDisabled = false;
@@ -50,7 +49,7 @@ plugin.botIrcConnectionRegisteredHandle = function() {
 		} else {
 			clearInterval(botUpdateInterval);
 		}
-	}, pluginSettings.botUpdateInterval||10000);
+	}, pOpts.botUpdateInterval||10000);
 	bot.ircConnection.once('close', function() {
 		clearInterval(botUpdateInterval);
 	});
@@ -67,7 +66,7 @@ module.exports.botEvent = function (event) {
 	//event is a object with properties "eventName" and "eventData"
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
-			if (event.eventData == pluginId) {pluginDisabled = true;}
+			if (event.eventData == pId) {pluginDisabled = true;}
 			break;
 		case 'botIrcConnectionRegistered':
 			plugin.botIrcConnectionRegisteredHandle();
@@ -79,25 +78,24 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (i, b) {
 	//update variables
 	bot = b;
-	pluginId = i;
-	settings = bot.options;
-	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = bot.ircChannelUsers;
-	
+	pId = i;
+	options = bot.options;
+	pOpts = options.pluginsSettings[pId];
+
 	//if plugin settings are not defined, define them
-	if (pluginSettings === undefined) {
-		pluginSettings = new SettingsConstructor();
-		settings.pluginsSettings[pluginId] = pluginSettings;
+	if (pOpts === undefined) {
+		pOpts = new SettingsConstructor();
+		options.pluginsSettings[pId] = pOpts;
 		bot.im.settingsSave();
 	}
-	
+
 	//if loaded after connection has already registered
 	//make sure the handle runs
 	if (bot.ircConnectionRegistered) {
 		plugin.botIrcConnectionRegisteredHandle();
 	}
-	
+
 	//plugin is ready
 	exports.ready = true;
-	bot.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pId);
 };

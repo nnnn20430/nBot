@@ -18,10 +18,9 @@
 "use strict";
 //reserved nBot variables
 var bot;
-var pluginId;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var pId;
+var options;
+var pOpts;
 
 //variables
 var pluginDisabled = false;
@@ -66,7 +65,7 @@ module.exports.botEvent = function (event) {
 			plugin.botIrcConnectionCreatedHandle(event.eventData);
 			break;
 		case 'botPluginDisableEvent':
-			if (event.eventData == pluginId) {pluginDisabled = true;}
+			if (event.eventData == pId) {pluginDisabled = true;}
 			break;
 	}
 };
@@ -75,18 +74,17 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (i, b) {
 	//update variables
 	bot = b;
-	pluginId = i;
-	settings = bot.options;
-	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = bot.ircChannelUsers;
-	
+	pId = i;
+	options = bot.options;
+	pOpts = options.pluginsSettings[pId];
+
 	//if loaded after connection has already been created/registered
 	//make sure the handle runs
 	if (bot.ircConnectionRegistered) {
 		plugin.botIrcConnectionCreatedHandle(bot.ircConnection);
 	}
-	
+
 	//plugin is ready
 	exports.ready = true;
-	bot.emitBotEvent('botPluginReadyEvent', pluginId);
+	bot.emitBotEvent('botPluginReadyEvent', pId);
 };

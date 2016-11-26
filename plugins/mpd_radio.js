@@ -18,17 +18,13 @@
 "use strict";
 //reserved nBot variables
 var bot;
-var pluginId;
-var settings;
-var pluginSettings;
-var ircChannelUsers;
+var pId;
+var options;
+var pOpts;
 
 //variables
 var http = require('http');
 var net = require('net');
-var exec = require('child_process').exec;
-var events = require('events');
-var url = require('url');
 
 var pluginDisabled = false;
 
@@ -59,7 +55,7 @@ plugin.getNowPlaying = function (callback) {
 	var currentsong, listeners;
 	function getRadioStatus() {
 		function getCurrentSong() {
-			var mpdConnection = net.connect({port: pluginSettings.mpdServerPort, host: pluginSettings.mpdServer},
+			var mpdConnection = net.connect({port: pOpts.mpdServerPort, host: pOpts.mpdServer},
 				function() { //'connect' listener
 					mpdConnection.setEncoding('utf8');
 					mpdConnection.on('data', function (data) {
@@ -77,7 +73,7 @@ plugin.getNowPlaying = function (callback) {
 			mpdConnection.on('timeout', function (e) {mpdConnection.end(); mpdConnection.destroy(); callback("Got error: Connection Timeout");});
 		}
 		function getListeners() {
-			http.get(pluginSettings.icecastStatsUrl, function(res) {
+			http.get(pOpts.icecastStatsUrl, function(res) {
 				var data = '';
 				res.setEncoding('utf8');
 				res.on('data', function (chunk) {data += chunk;});
@@ -96,7 +92,7 @@ plugin.getNowPlaying = function (callback) {
 			var currentSongName = new RegExp('file: (?:[^\/]*\/)*(.*)').exec(currentsongLines[0]);
 			var currentSongPos = currentsongLines.filter(function (element, index, array) {if (element.substr(0, 'Pos: '.length) == 'Pos: ') {return true;}})[0]; if (currentSongPos) {currentSongPos=+currentSongPos.substr('Pos: '.length)+1;}
 			if (currentSongName !== null) {
-				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at '+pluginSettings.tuneinUrl);
+				callback('Now Playing: '+currentSongName[1].replace(/\.[^.]*$/, '')+' (Pos: '+currentSongPos+') | Listeners: '+listeners+' | Tune in at '+pOpts.tuneinUrl);
 			}
 		}
 	}
@@ -105,12 +101,12 @@ plugin.getNowPlaying = function (callback) {
 
 //send command to mpd
 plugin.mpdSendCommand = function (command) {
-	var mpdConnection = net.connect({port: pluginSettings.mpdServerPort, host: pluginSettings.mpdServer},
+	var mpdConnection = net.connect({port: pOpts.mpdServerPort, host: pOpts.mpdServer},
 		function() { //'connect' listener
 			mpdConnection.setEncoding('utf8');
 			mpdConnection.on('data', function (data) {
 				if (data == new RegExp('OK MPD [^\n]*\n').exec(data)){
-					mpdConnection.write('password '+pluginSettings.mpdServerPassword+'\n');
+					mpdConnection.write('password '+pOpts.mpdServerPassword+'\n');
 					mpdConnection.write(command+'\n');
 					mpdConnection.end(); mpdConnection.destroy();
 				}
@@ -127,7 +123,7 @@ plugin.pluginReadyCheck = function () {
 	bot.plugins.commands.ready) {
 		//plugin is ready
 		exports.ready = true;
-		bot.emitBotEvent('botPluginReadyEvent', pluginId);
+		bot.emitBotEvent('botPluginReadyEvent', pId);
 	}
 };
 
@@ -138,31 +134,31 @@ plugin.utilizeCommands = function () {
 		plugin.getNowPlaying(function (response) {
 			bot.ircSendCommandPRIVMSG(response, data.responseTarget);
 		});
-	}, 'np: shows currently playing song on the radio', pluginId);
+	}, 'np: shows currently playing song on the radio', pId);
 	
 	commandsPlugin.commandAdd('mpd_play', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('play '+(+data.messageARGS[1]-1));
 			bot.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
 		}
-	}, 'mpd_play "pos": plays the song at position', pluginId);
+	}, 'mpd_play "pos": plays the song at position', pId);
 	
 	commandsPlugin.commandAdd('mpd_random', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('random '+data.messageARGS[1]);
 			bot.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
 		}
-	}, 'mpd_random "state": sets random state to state (0 or 1)', pluginId);
+	}, 'mpd_random "state": sets random state to state (0 or 1)', pId);
 	
 	commandsPlugin.commandAdd('mpd_prio', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
 			bot.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
 		}
-	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pluginId);
+	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pId);
 	
 	commandsPlugin.commandAdd('mpd_queue_song', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 				var pos = +data.messageARGS[1]-1, endpos = +data.messageARGS[2], prio = 255;
 				if (!data.messageARGS[2]) {
 					plugin.mpdSendCommand('random 1\nprio 0 -1\nprio 255 '+pos);
@@ -177,10 +173,10 @@ plugin.utilizeCommands = function () {
 					bot.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 				}
 		}
-	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pluginId);
+	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pId);
 	
 	commandsPlugin.commandAdd('mpd_queue_songs', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 				var posArray = data.messageARGS[1].split(' ');
 				var commandString = 'random 0\nrandom 1\nprio 0 -1', pos, prio = 255;
 				for (pos in posArray) {
@@ -192,13 +188,13 @@ plugin.utilizeCommands = function () {
 				plugin.mpdSendCommand(commandString);
 				bot.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 		}
-	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pluginId);
+	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pId);
 	
 	commandsPlugin.commandAdd('mpd_raw', function (data) {
-		if (commandsPlugin.isOp(data.nick) || !pluginSettings.mpdCommandsOpOnly) {
+		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand(data.messageARGS[1]);
 		}
-	}, 'mpd_raw "command": send command to mpd)', pluginId);
+	}, 'mpd_raw "command": send command to mpd)', pId);
 	
 	plugin.pluginReadyCheck();
 };
@@ -213,7 +209,7 @@ module.exports.ready = false;
 module.exports.botEvent = function (event) {
 	switch (event.eventName) {
 		case 'botPluginDisableEvent':
-			if (event.eventData == pluginId) {pluginDisabled = true;}
+			if (event.eventData == pId) {pluginDisabled = true;}
 			break;
 		case 'botPluginReadyEvent':
 			if (event.eventData == 'commands') {plugin.utilizeCommands();}
@@ -225,18 +221,17 @@ module.exports.botEvent = function (event) {
 module.exports.main = function (i, b) {
 	//update variables
 	bot = b;
-	pluginId = i;
-	settings = bot.options;
-	pluginSettings = settings.pluginsSettings[pluginId];
-	ircChannelUsers = bot.ircChannelUsers;
-	
+	pId = i;
+	options = bot.options;
+	pOpts = options.pluginsSettings[pId];
+
 	//if plugin settings are not defined, define them
-	if (pluginSettings === undefined) {
-		pluginSettings = new SettingsConstructor();
-		settings.pluginsSettings[pluginId] = pluginSettings;
+	if (pOpts === undefined) {
+		pOpts = new SettingsConstructor();
+		options.pluginsSettings[pId] = pOpts;
 		bot.im.settingsSave();
 	}
-	
+
 	//check and utilize dependencies
 	if (bot.plugins.commands &&
 	bot.plugins.commands.ready) {
