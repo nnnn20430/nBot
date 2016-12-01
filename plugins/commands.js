@@ -211,7 +211,7 @@ plugin.utilizeSimpleMsg = function () {
 			bot.ircSendCommandPRIVMSG(pOpts.specificResponses[data.message], data.responseTarget);
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'JOIN', function (data) {
 		if (data.nick != options.botName){
 			if (pOpts.reactToJoinPart === true) {
@@ -239,7 +239,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'PART', function (data) {
 		if (data.nick != options.botName){
 			if (pOpts.reactToJoinPart === true) {
@@ -251,7 +251,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'QUIT', function (data) {
 		if (data.nick != options.botName){
 			if(plugin.isOp(data.nick)){plugin.authenticatedOpUsers.remove(data.nick);}
@@ -285,7 +285,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'NICK', function (data) {
 		if (data.nick != options.botName){
 			if(plugin.isOp(data.nick)){
@@ -294,7 +294,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'KICK', function (data) {
 		if (data.nick != options.botName){
 			if(plugin.isOp(data.nick)){
@@ -303,7 +303,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	plugin.pluginReadyCheck();
 };
 

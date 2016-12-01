@@ -91,22 +91,22 @@ plugin.parseSeconds = function (s) {
 	var secDay = secHour * 24;
 	var secWeek = secDay * 7;
 	var secYear = secWeek * 52;
-	
+
 	var years = Math.floor(seconds / secYear);
 	seconds = seconds - (years * secYear);
-	
+
 	var weeks = Math.floor(seconds / secWeek);
 	seconds = seconds - (weeks * secWeek);
-	
+
 	var days = Math.floor(seconds / secDay);
 	seconds = seconds - (days * secDay);
-	
+
 	var hours = Math.floor(seconds / secHour);
 	seconds = seconds - (hours * secHour);
-	
+
 	var minutes = Math.floor(seconds / secMinute);
 	seconds = seconds - (minutes * secMinute);
-	
+
 	return [years, weeks, days, hours, minutes, seconds];
 };
 
@@ -131,7 +131,7 @@ plugin.parseTimeToSeconds = function (string) {
 	var secDay = secHour * 24;
 	var secWeek = secDay * 7;
 	var secYear = secWeek * 52;
-	
+
 	if((match = string.match('([0-9]+)y')) !== null) {
 		seconds += +match[1]*secYear;
 	}
@@ -150,7 +150,7 @@ plugin.parseTimeToSeconds = function (string) {
 	if((match = string.match('([0-9]+)s')) !== null) {
 		seconds += +match[1];
 	}
-	
+
 	return seconds;
 };
 
@@ -177,7 +177,7 @@ plugin.birthdaysInit = function () {
 			bot.ircSendCommandPRIVMSG('Born on: '+bday.getFullYear()+' '+(bday.getMonth() + 1)+' '+bday.getDate()+', next birthday in: '+nextbdayString+', birthday today: '+(bdayIsToday?'yes':'no')+'.', data.responseTarget);
 		}
 	}, 'bday "user": get date of known users birthday', pId);
-	
+
 	commandsPlugin.commandAdd('bdayadd', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.birthdaysCommandsOpOnly) {
 			var user = data.messageARGS[1];
@@ -187,7 +187,7 @@ plugin.birthdaysInit = function () {
 			}
 		}
 	}, 'bdayadd "user" "date": add new birthday', pId);
-	
+
 	commandsPlugin.commandAdd('bdayremove', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.birthdaysCommandsOpOnly) {
 			var user = data.messageARGS[1];
@@ -196,7 +196,7 @@ plugin.birthdaysInit = function () {
 			}
 		}
 	}, 'bdayremove "user": remove a existing birthday', pId);
-	
+
 	commandsPlugin.commandAdd('bdayuserlist', function (data) {
 		var bdayUserList = "";
 		for (var user in pOpts.birthdayData) {
@@ -204,7 +204,7 @@ plugin.birthdaysInit = function () {
 		}
 		bot.ircSendCommandPRIVMSG("Known users are: "+bdayUserList.replace(/, $/, ".").replace(/^$/, 'No known users.'), data.responseTarget);
 	}, 'bdayuserlist: list known birthday users', pId);
-	
+
 	commandsPlugin.commandAdd('age', function (data) {
 		var user = data.messageARGS[1];
 		var bdaySec, bday, age;
@@ -296,7 +296,7 @@ plugin.convertValue = function (from, to, value) {
 		convertedValue,
 		valueType;
 	value = +value;
-		
+
 	switch (from) {
 		case 'Bit':
 			baseValue = value;
@@ -405,7 +405,7 @@ plugin.convertValue = function (from, to, value) {
 			}
 			break;
 	}
-	
+
 	if (valueType == 'digital_storage') {
 		switch (to) {
 			case 'Bit':
@@ -489,7 +489,7 @@ plugin.convertValue = function (from, to, value) {
 			break;
 		}
 	}
-	
+
 	return convertedValue;
 };
 
@@ -586,13 +586,13 @@ plugin.utilizeSimpleMsg = function () {
 	simpleMsg.msgListenerAdd(pId, 'PRIVMSG', function (data) {
 		plugin.mainMiscMsgHandle(data);
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'PART', function (data) {
 		if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
 			delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'QUIT', function (data) {
 		for (var i in data.channels) {
 			if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
@@ -600,7 +600,7 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'NICK', function (data) {
 		for (var i in data.channels) {
 			if (plugin.channelMessageStatisticsObj[data.channels[i]] && plugin.channelMessageStatisticsObj[data.channels[i]][data.nick]) {
@@ -609,13 +609,13 @@ plugin.utilizeSimpleMsg = function () {
 			}
 		}
 	});
-	
+
 	simpleMsg.msgListenerAdd(pId, 'KICK', function (data) {
 		if (plugin.channelMessageStatisticsObj[data.channel] && plugin.channelMessageStatisticsObj[data.channel][data.nick]) {
 			delete plugin.channelMessageStatisticsObj[data.channel][data.nick];
 		}
 	});
-	
+
 	plugin.pluginReadyCheck();
 };
 
@@ -626,25 +626,25 @@ plugin.utilizeCommands = function () {
 		var parsedTime = plugin.parseSeconds(data.messageARGS[1]);
 		bot.ircSendCommandPRIVMSG(plugin.parsedSecondsToString(parsedTime), data.responseTarget);
 	}, 'parseseconds "seconds": parse seconds to years, days, hours, minutes, seconds', pId);
-	
+
 	commandsPlugin.commandAdd('parsetime', function (data) {
 		var parsedTime = plugin.parseTimeToSeconds(data.messageARGS[1]);
 		bot.ircSendCommandPRIVMSG(parsedTime, data.responseTarget);
 	}, 'parsetime "time": parse "y d h m s" to seconds', pId);
-	
+
 	commandsPlugin.commandAdd('sendwol', function (data) {
 		plugin.sendWoL(data.messageARGS[1], data.messageARGS[2]);
 	}, 'sendwol "mac" ["ip"]: send wake on lan magic packet', pId);
-	
+
 	commandsPlugin.commandAdd('convert', function (data) {
 		var convertedValue;
 		bot.ircSendCommandPRIVMSG((convertedValue = plugin.convertValue(data.messageARGS[1], data.messageARGS[2], data.messageARGS[3])) !== undefined ? convertedValue:'Unable to convert.', data.responseTarget);
 	}, 'convert "from" "to" "value": convert value to another', pId);
-	
+
 	commandsPlugin.commandAdd('1337', function (data) {
 		bot.ircSendCommandPRIVMSG(plugin.strTo1337(data.messageARGS[1]), data.responseTarget);
 	}, '1337 "text": convert text to 1337 text', pId);
-	
+
 	commandsPlugin.commandAdd('countdown', function (data) {
 		var timeoutId;
 		var response = "";
@@ -676,22 +676,22 @@ plugin.utilizeCommands = function () {
 				break;
 		}
 	}, 'countdown SET|REMOVE|LIST|SHOW ["name"] ["seconds"]: set, list or show countdowns', pId);
-	
+
 	commandsPlugin.commandAdd('reverse', function (data) {
 		var txt = data.messageARGS[1], txtr = '';
 		var i = txt.length; while (i >= 0) {txtr += txt.charAt(i); i--;}
 		bot.ircSendCommandPRIVMSG(txtr, data.responseTarget);
 	}, 'reverse "text": reverse text', pId);
-	
+
 	commandsPlugin.commandAdd('randomnumber', function (data) {
 		bot.ircSendCommandPRIVMSG(commandsPlugin.getRandomInt(+data.messageARGS[1]||0, +data.messageARGS[2]||10), data.responseTarget);
 	}, 'randomnumber "min" "max": print random number', pId);
-	
+
 	commandsPlugin.commandAdd('uptime', function (data) {
 		var upTime = plugin.parseSeconds(Math.round(process.uptime()));
 		bot.ircSendCommandPRIVMSG('Uptime: '+plugin.parsedSecondsToString(upTime), data.responseTarget);
 	}, 'uptime: print time passed since nBot process was started', pId);
-	
+
 	plugin.pluginReadyCheck();
 };
 

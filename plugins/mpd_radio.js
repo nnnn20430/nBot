@@ -135,28 +135,28 @@ plugin.utilizeCommands = function () {
 			bot.ircSendCommandPRIVMSG(response, data.responseTarget);
 		});
 	}, 'np: shows currently playing song on the radio', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_play', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('play '+(+data.messageARGS[1]-1));
 			bot.ircSendCommandPRIVMSG('Playing song: "'+data.messageARGS[1]+'"', data.responseTarget);
 		}
 	}, 'mpd_play "pos": plays the song at position', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_random', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('random '+data.messageARGS[1]);
 			bot.ircSendCommandPRIVMSG('mpd: updated random mode', data.responseTarget);
 		}
 	}, 'mpd_random "state": sets random state to state (0 or 1)', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_prio', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand('prio '+data.messageARGS[1]+' '+(+data.messageARGS[2]-1));
 			bot.ircSendCommandPRIVMSG('mpd: priority set', data.responseTarget);
 		}
 	}, 'mpd_prio "priority" "pos": sets priority (0 - 255) of song at pos in random mode', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_queue_song', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 				var pos = +data.messageARGS[1]-1, endpos = +data.messageARGS[2], prio = 255;
@@ -174,7 +174,7 @@ plugin.utilizeCommands = function () {
 				}
 		}
 	}, 'mpd_queue_song "pos" ["endpos"]: queues song at pos if endpos is set then play queue from pos to endpos (enables random mode)', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_queue_songs', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 				var posArray = data.messageARGS[1].split(' ');
@@ -189,13 +189,13 @@ plugin.utilizeCommands = function () {
 				bot.ircSendCommandPRIVMSG('mpd: Songs queued', data.responseTarget);
 		}
 	}, 'mpd_queue_songs "pos list": queues songs using position, positions are seperated using a single space (enables random mode)', pId);
-	
+
 	commandsPlugin.commandAdd('mpd_raw', function (data) {
 		if (commandsPlugin.isOp(data.nick) || !pOpts.mpdCommandsOpOnly) {
 			plugin.mpdSendCommand(data.messageARGS[1]);
 		}
 	}, 'mpd_raw "command": send command to mpd)', pId);
-	
+
 	plugin.pluginReadyCheck();
 };
 
