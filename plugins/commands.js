@@ -460,7 +460,9 @@ plugin.commandsHelpArray = [
 	['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
 	['date', 'date [UTC|ISO|UNIX]: get current date'],
 	['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
-	['binary', 'binary ENCODE|DECODE "string"']
+	['binary', 'binary ENCODE|DECODE "string"'],
+	['quaternary', 'quaternary "string": convert between binary and quaternary'],
+	['dna', 'dna "string": convert between quaternary and dna']
 ];
 
 //bot commands object
@@ -718,31 +720,151 @@ plugin.commandsObject = {
 			});
 		}
 	},
-	binary: function (data) {
-		var response = '', strArr, i, message = '';
+	binary: function (data, callback) {
+		var i, strArr, msgB = '', msgA = '';
 		for (i in data.messageARGS) {
 			if (i > 1) {
-				message += ' '+data.messageARGS[i];
+				msgB += ' '+data.messageARGS[i];
 			}
 		}
-		message=message.substr(1);
-		switch (data.messageARGS[1]?data.messageARGS[1].toUpperCase():null) {
-			case 'ENCODE':
-				strArr = message.split('');
+		msgB = msgB.substr(1);
+		switch (
+			data.messageARGS[1]?
+			data.messageARGS[1].toUpperCase().split('')[0]:
+			null
+		) {
+			case 'E':
+				strArr = msgB.split('');
 				for (i in strArr) {
-					response += ' '+('0000000'+parseInt(new Buffer(strArr[i].toString(), 'utf8').toString('hex'), 16).toString(2)).slice(-8);
+					msgA += ' '+('0000000'+parseInt(
+						new Buffer(
+							strArr[i].toString(), 'utf8'
+						).toString('hex'), 16
+					).toString(2)).slice(-8);
 				}
-				response=response.substr(1);
+				msgA = msgA.substr(1);
 				break;
-			case 'DECODE':
-				message=message.split(' ').join('');
-				i=0;
-				while (8*(i+1) <= message.length) {
-					response += new Buffer(parseInt(message.substr(8*i, 8), 2).toString(16), 'hex').toString('utf8'); i++;
+			case 'D':
+				msgB = msgB.split(' ').join('');
+				i = 0;
+				while (8*(i+1) <= msgB.length) {
+					msgA += new Buffer(
+						parseInt(
+							msgB.substr(8*i, 8), 2
+						).toString(16), 'hex'
+					).toString('utf8');
+					i++;
 				}
 				break;
 		}
-		bot.ircSendCommandPRIVMSG(response, data.responseTarget);
+		if (callback)
+			callback(msgA);
+		else
+			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
+	quaternary: function (data, callback) {
+		var i, strArr, c, msgB = '', msgA = '', type = 'binary';
+		for (i in data.messageARGS) {
+			if (i > 0) {
+				msgB += ''+data.messageARGS[i];
+			}
+		}
+		strArr = msgB.split('');
+		for (i in strArr) {
+			switch (strArr[i]) {
+				default: type = 'invalid'; break;
+				case '0': break;
+				case '1': break;
+				case '2': type = (type == 'binary'?'quaternary':type); break;
+				case '3': type = (type == 'binary'?'quaternary':type); break;
+			}
+		}
+		switch (type) {
+			case 'binary':
+				i = 0;
+				while (2*(i+1) <= msgB.length) {
+					c = msgB.substr(2*i, 2);
+					switch (c) {
+						case '00': msgA += '0'; break;
+						case '01': msgA += '1'; break;
+						case '10': msgA += '2'; break;
+						case '11': msgA += '3'; break;
+					}
+					i++;
+				}
+				break;
+			case 'quaternary':
+				for (i in strArr) {
+					switch (strArr[i]) {
+						case '0': msgA += '00'; break;
+						case '1': msgA += '01'; break;
+						case '2': msgA += '10'; break;
+						case '3': msgA += '11'; break;
+					}
+				}
+				break;
+		}
+		if (type != 'invalid')
+			if (callback)
+				callback(msgA);
+			else
+				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
+	dna: function (data, callback) {
+		var i, strArr, msgB = '', msgA = '', type = 'quaternary';
+		for (i in data.messageARGS) {
+			if (i > 0) {
+				msgB += ''+data.messageARGS[i];
+			}
+		}
+		msgB = msgB.toUpperCase();
+		strArr = msgB.split('');
+		for (i in strArr) {
+			switch (strArr[i]) {
+				default: type = 'invalid'; break;
+				case '0':
+					if (type == 'quaternary') msgA += 'A';
+					else type = 'invalid';
+					break;
+				case '1':
+					if (type == 'quaternary') msgA += 'C';
+					else type = 'invalid';
+					break;
+				case '2':
+					if (type == 'quaternary') msgA += 'G';
+					else type = 'invalid';
+					break;
+				case '3':
+					if (type == 'quaternary') msgA += 'T';
+					else type = 'invalid';
+					break;
+				case 'A':
+					if (type == 'quaternary')
+						type = (msgA.length?'invalid':'dna');
+					if (type == 'dna') msgA += '0';
+					break;
+				case 'T':
+					if (type == 'quaternary')
+						type = (msgA.length?'invalid':'dna');
+					if (type == 'dna') msgA += '3';
+					break;
+				case 'C':
+					if (type == 'quaternary')
+						type = (msgA.length?'invalid':'dna');
+					if (type == 'dna') msgA += '1';
+					break;
+				case 'G':
+					if (type == 'quaternary')
+						type = (msgA.length?'invalid':'dna');
+					if (type == 'dna') msgA += '2';
+					break;
+			}
+		}
+		if (type != 'invalid')
+			if (callback)
+				callback(msgA);
+			else
+				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
 	}
 };
 
@@ -771,7 +893,7 @@ plugin.pluggableFunctionObject = {
 	},
 	ctcpVersion: function (data) {
 		if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {
-			bot.ircSendCommandNOTICE("\x01VERSION nBot v0.3.1.0\x01", data.nick);
+			bot.ircSendCommandNOTICE("\x01VERSION nBot v0.3.1.4\x01", data.nick);
 		}
 	},
 	ctcpPing: function (data) {
