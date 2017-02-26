@@ -77,9 +77,9 @@ plugin.pingTcpServer = function (host, port, callback){
 		});
 		pingHost.setTimeout(5*1000);
 		pingHost.on('timeout', function () {pingHost.end();pingHost.destroy();returnResults(false, 'timeout');});
-		pingHost.on('error', function (e) {pingHost.end();pingHost.destroy();returnResults(false, 'error: ('+e+')');});
-		pingHost.on('close', function () {returnResults(false, 'closed');});
-	} else {returnResults(false, 'error: port out of range');}
+		pingHost.on('error', function (e) {pingHost.end();pingHost.destroy();returnResults(false, e);});
+		pingHost.on('close', function () {returnResults(false, 'socket closed');});
+	} else {returnResults(false, 'Error: port out of range');}
 };
 
 //misc plugin functions: return entire help
@@ -461,8 +461,10 @@ plugin.commandsHelpArray = [
 	['date', 'date [UTC|ISO|UNIX]: get current date'],
 	['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
 	['binary', 'binary ENCODE|DECODE "string"'],
+	['binarycomp', 'binarycomp "string": binary complement'],
 	['quaternary', 'quaternary "string": convert between binary and quaternary'],
-	['dna', 'dna "string": convert between quaternary and dna']
+	['dna', 'dna "string": convert between quaternary and dna'],
+	['dnacomp', 'dnacomp "string": dna complement']
 ];
 
 //bot commands object
@@ -507,13 +509,9 @@ plugin.commandsObject = {
 	},
 	ping: function (data) {
 		plugin.pingTcpServer(data.messageARGS[1], data.messageARGS[2], function (status, info) {
-			var statusString;
-			if (status){
-				statusString="open";
-			} else {
-				statusString="closed";
-			}
-			bot.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString+", "+(bot.isNumeric(info)?info+"ms":info), data.responseTarget);
+			var statusString = (status?'open':'closed');
+			var infoString = (status?(bot.isNumeric(info)?info+"ms":info):info);
+			bot.ircSendCommandPRIVMSG("Port "+data.messageARGS[2]+" on "+data.messageARGS[1]+" is: "+statusString+" ("+infoString+")", data.responseTarget);
 		});
 	},
 	nbot: function (data) {
@@ -762,6 +760,23 @@ plugin.commandsObject = {
 		else
 			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
 	},
+	binarycomp: function (data, callback) {
+		var i, strArr, c, msgB = '', msgA = '';
+		for (i in data.messageARGS) {
+			if (i > 0) {
+				msgB += ''+data.messageARGS[i];
+			}
+		}
+		strArr = msgB.split('');
+		for (i in strArr) {
+			msgA += (+strArr[i] === 0?1:(+strArr[i] === 1?0:''));
+		}
+		if (msgA.length == msgB.length)
+			if (callback)
+				callback(msgA);
+			else
+				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
 	quaternary: function (data, callback) {
 		var i, strArr, c, msgB = '', msgA = '', type = 'binary';
 		for (i in data.messageARGS) {
@@ -865,6 +880,32 @@ plugin.commandsObject = {
 				callback(msgA);
 			else
 				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
+	dnacomp: function (data, callback) {
+		var i, strArr, msgB = '', msgA = '';
+		var e, tT = [
+			['A', 'T'],
+			['C', 'G']
+		];
+		for (i in data.messageARGS) {
+			if (i > 0) {
+				msgB += ''+data.messageARGS[i];
+			}
+		}
+		msgB = msgB.toUpperCase();
+		strArr = msgB.split('');
+		for (i in strArr) {
+			for (e in tT) {
+				if (strArr[i] == tT[e][0])
+					msgA += tT[e][1];
+				else if (strArr[i] == tT[e][1])
+					msgA += tT[e][0];
+			}
+		}
+		if (callback)
+			callback(msgA);
+		else
+			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
 	}
 };
 
