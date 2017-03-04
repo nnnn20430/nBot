@@ -461,6 +461,7 @@ plugin.commandsHelpArray = [
 	['date', 'date [UTC|ISO|UNIX]: get current date'],
 	['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
 	['ascii', 'ascii ENCODE|DECODE "string": convert between text and ascii binary representation'],
+	['binary', 'binary ENCODE|DECODE "string": convert between decimal and binary'],
 	['binarycomp', 'binarycomp "string": binary complement'],
 	['hex', 'hex ENCODE|DECODE "string": convert between binary and hex'],
 	['quaternary', 'quaternary ENCODE|DECODE "string": convert between binary and quaternary'],
@@ -755,6 +756,44 @@ plugin.commandsObject = {
 					i++;
 				}
 				break;
+		}
+		if (callback)
+			callback(msgA);
+		else
+			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
+	binary: function (data, callback) {
+		var i, n = 0, strArr, msgB = '', msgA = '';
+		for (i in data.messageARGS) {
+			if (i > 1) {
+				msgB += ''+data.messageARGS[i];
+			}
+		}
+		if (bot.isNumeric(msgB)) {
+			switch (
+				data.messageARGS[1]?
+				data.messageARGS[1].toUpperCase().split('')[0]:
+				null
+			) {
+				case 'E':
+					n = +msgB;
+					msgA = [];
+					while (n !== 0) {
+						msgA = msgA.concat([n%2]);
+						n = Math.floor(n/2);
+					}
+					msgA = msgA.reverse().join('');
+					break;
+				case 'D':
+					i = 0;
+					strArr = msgB.split('').reverse();
+					while (strArr[i] !== undefined) {
+						n += (Math.pow(2,i)*(+strArr[i]));
+						i++;
+					}
+					msgA = ''+n;
+					break;
+			}
 		}
 		if (callback)
 			callback(msgA);
