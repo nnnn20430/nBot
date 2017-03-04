@@ -460,9 +460,10 @@ plugin.commandsHelpArray = [
 	['plugindisable', 'plugindisable "plugin": disable a loaded plugin (op only)'],
 	['date', 'date [UTC|ISO|UNIX]: get current date'],
 	['sh', 'sh "shell expresion": run commands through /bin/sh (op only)'],
-	['binary', 'binary ENCODE|DECODE "string"'],
+	['ascii', 'ascii ENCODE|DECODE "string": convert between text and ascii binary representation'],
 	['binarycomp', 'binarycomp "string": binary complement'],
-	['quaternary', 'quaternary "string": convert between binary and quaternary'],
+	['hex', 'hex ENCODE|DECODE "string": convert between binary and hex'],
+	['quaternary', 'quaternary ENCODE|DECODE "string": convert between binary and quaternary'],
 	['dna', 'dna "string": convert between quaternary and dna'],
 	['dnacomp', 'dnacomp "string": dna complement']
 ];
@@ -718,7 +719,7 @@ plugin.commandsObject = {
 			});
 		}
 	},
-	binary: function (data, callback) {
+	ascii: function (data, callback) {
 		var i, strArr, msgB = '', msgA = '';
 		for (i in data.messageARGS) {
 			if (i > 1) {
@@ -777,53 +778,111 @@ plugin.commandsObject = {
 			else
 				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
 	},
-	quaternary: function (data, callback) {
-		var i, strArr, c, msgB = '', msgA = '', type = 'binary';
+	hex: function (data, callback) {
+		var i, strArr, c, msgB = '', msgA = '';
+		var e, tT = [
+			['0', '0000'], ['1', '0001'], ['2', '0010'], ['3', '0011'],
+			['4', '0100'], ['5', '0101'], ['6', '0110'], ['7', '0111'],
+			['8', '1000'], ['9', '1001'], ['A', '1010'], ['B', '1011'],
+			['C', '1100'], ['D', '1101'], ['E', '1110'], ['F', '1111']
+		];
 		for (i in data.messageARGS) {
-			if (i > 0) {
+			if (i > 1) {
+				msgB += ''+data.messageARGS[i].toUpperCase();
+			}
+		}
+		strArr = msgB.split('');
+		switch (
+			data.messageARGS[1]?
+			data.messageARGS[1].toUpperCase().split('')[0]:
+			null
+		) {
+			case 'E':
+				i = 0;
+				msgA = [];
+				strArr = strArr
+					.reverse()
+					.concat(['','','','','','','']); // 3+4 padding
+				while (true) {
+					c = '';
+					c += strArr[4*i+3];
+					c += strArr[4*i+2];
+					c += strArr[4*i+1];
+					c += strArr[4*i+0];
+					if (c === '') break;
+					c = ('000'+c).slice(-4); // more padding
+					for (e in tT) {
+						if (c === tT[e][1])
+							msgA = msgA.concat([tT[e][0]]);
+					}
+					i++;
+				}
+				msgA = msgA.reverse().join('');
+				break;
+			case 'D':
+				for (i in strArr) {
+					for (e in tT) {
+						if (strArr[i] === tT[e][0])
+							msgA += tT[e][1];
+					}
+				}
+				break;
+		}
+		if (callback)
+			callback(msgA);
+		else
+			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+	},
+	quaternary: function (data, callback) {
+		var i, strArr, c, msgB = '', msgA = '';
+		var e, tT = [
+			['0', '00'], ['1', '01'],
+			['2', '10'], ['3', '11']
+		];
+		for (i in data.messageARGS) {
+			if (i > 1) {
 				msgB += ''+data.messageARGS[i];
 			}
 		}
 		strArr = msgB.split('');
-		for (i in strArr) {
-			switch (strArr[i]) {
-				default: type = 'invalid'; break;
-				case '0': break;
-				case '1': break;
-				case '2': type = (type == 'binary'?'quaternary':type); break;
-				case '3': type = (type == 'binary'?'quaternary':type); break;
-			}
-		}
-		switch (type) {
-			case 'binary':
+		switch (
+			data.messageARGS[1]?
+			data.messageARGS[1].toUpperCase().split('')[0]:
+			null
+		) {
+			case 'E':
 				i = 0;
-				while (2*(i+1) <= msgB.length) {
-					c = msgB.substr(2*i, 2);
-					switch (c) {
-						case '00': msgA += '0'; break;
-						case '01': msgA += '1'; break;
-						case '10': msgA += '2'; break;
-						case '11': msgA += '3'; break;
+				msgA = [];
+				strArr = strArr
+					.reverse()
+					.concat(['','','']); // 1+2 padding
+				while (true) {
+					c = '';
+					c += strArr[2*i+1];
+					c += strArr[2*i+0];
+					if (c === '') break;
+					c = ('0'+c).slice(-2); // more padding
+					for (e in tT) {
+						if (c === tT[e][1])
+							msgA = msgA.concat([tT[e][0]]);
 					}
 					i++;
 				}
+				msgA = msgA.reverse().join('');
 				break;
-			case 'quaternary':
+			case 'D':
 				for (i in strArr) {
-					switch (strArr[i]) {
-						case '0': msgA += '00'; break;
-						case '1': msgA += '01'; break;
-						case '2': msgA += '10'; break;
-						case '3': msgA += '11'; break;
+					for (e in tT) {
+						if (strArr[i] === tT[e][0])
+							msgA += tT[e][1];
 					}
 				}
 				break;
 		}
-		if (type != 'invalid')
-			if (callback)
-				callback(msgA);
-			else
-				bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
+		if (callback)
+			callback(msgA);
+		else
+			bot.ircSendCommandPRIVMSG(msgA, data.responseTarget);
 	},
 	dna: function (data, callback) {
 		var i, strArr, msgB = '', msgA = '', type = 'quaternary';
