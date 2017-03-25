@@ -1032,7 +1032,7 @@ plugin.pluggableFunctionObject = {
 	},
 	ctcpVersion: function (data) {
 		if (new RegExp('\x01VERSION\x01', 'g').exec(data.message) !== null) {
-			bot.ircSendCommandNOTICE("\x01VERSION nBot v0.3.1.4\x01", data.nick);
+			bot.ircSendCommandNOTICE("\x01VERSION nBot v0.3.1.5\x01", data.nick);
 		}
 	},
 	ctcpPing: function (data) {
